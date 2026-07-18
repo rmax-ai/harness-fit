@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext"],
+    "types": ["bun-types"],
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": false,
+    "baseUrl": ".",
+    "paths": {
+      "@harnessfit/core": ["./packages/core/src"],
+      "@harnessfit/core/*": ["./packages/core/src/*"],
+      "@harnessfit/storage": ["./packages/storage/src"],
+      "@harnessfit/storage/*": ["./packages/storage/src/*"],
+      "@harnessfit/harness": ["./packages/harness/src"],
+      "@harnessfit/harness/*": ["./packages/harness/src/*"],
+      "@harnessfit/evaluator": ["./packages/evaluator/src"],
+      "@harnessfit/evaluator/*": ["./packages/evaluator/src/*"],
+      "@harnessfit/optimizer": ["./packages/optimizer/src"],
+      "@harnessfit/optimizer/*": ["./packages/optimizer/src/*"],
+      "@harnessfit/providers-openai": ["./packages/providers/openai/src"],
+      "@harnessfit/providers-anthropic": ["./packages/providers/anthropic/src"],
+      "@harnessfit/providers-google": ["./packages/providers/google/src"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "benchmarks/repositories"]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "harness-fit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome ci . && bun run typecheck",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  }
+}

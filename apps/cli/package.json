@@ -1,0 +1,18 @@
+{
+  "name": "@harnessfit/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "bin": {
+    "harnessfit": "./src/cli.ts"
+  },
+  "dependencies": {
+    "@harnessfit/core": "workspace:*",
+    "@harnessfit/storage": "workspace:*",
+    "@harnessfit/harness": "workspace:*",
+    "@harnessfit/evaluator": "workspace:*",
+    "@harnessfit/optimizer": "workspace:*"
+  }
+}

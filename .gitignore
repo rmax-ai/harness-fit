@@ -1,0 +1,46 @@
+# Bun
+node_modules/
+bun.lockb
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.envrc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Experiment artifacts
+experiments/results/*
+!experiments/results/.gitkeep
+
+# SQLite databases
+*.db
+*.db-journal
+*.db-wal
+
+# Coverage
+coverage/
+*.lcov
+
+# Benchmark repos (gitignored — cloned fresh in CI)
+benchmarks/repositories/*
+!benchmarks/repositories/.gitkeep
+
+# Logs
+*.log
+
+# Archives
+*.tar.gz
+*.zip
