@@ -1,0 +1,17 @@
+{
+  "id": "bug-001-status-filter",
+  "category": "bug_repair",
+  "difficulty": "easy",
+  "title": "Fix status filter returning incorrect results",
+  "description": "The `list --status` command returns all tasks regardless of the status filter. The bug is in the `list` method of TaskStore.",
+  "repository": "task-service",
+  "seeded_defect": "The filter.status check in TaskStore.list() uses a loose equality that always matches.",
+  "estimated_turns": 6,
+  "hidden_test_command": "bun test tests/hidden/status-filter.test.ts",
+  "reject_criteria": [
+    "must_not_modify_tests",
+    "must_not_disable_typecheck",
+    "must_not_introduce_any",
+    "must_not_delete_existing_tests"
+  ]
+}

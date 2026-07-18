@@ -1,0 +1,17 @@
+{
+  "id": "refactor-001-extract-validation",
+  "category": "refactoring",
+  "difficulty": "hard",
+  "title": "Extract validation logic into a separate module",
+  "description": "The CLI update handler has inline string validation. Extract all value validation (status, priority) into the validation module alongside existing validators. The public API and all tests must pass unchanged.",
+  "repository": "task-service",
+  "estimated_turns": 12,
+  "hidden_test_command": "bun test tests/hidden/extract-validation.test.ts",
+  "reject_criteria": [
+    "must_not_modify_tests",
+    "must_not_change_public_api",
+    "must_not_disable_typecheck",
+    "must_not_introduce_any",
+    "must_not_delete_existing_tests"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "compr-001-status-deps",
+  "category": "comprehension",
+  "difficulty": "medium",
+  "title": "Repository comprehension: Status enum dependencies",
+  "description": "Answer architectural questions about which modules depend on the task status enum and what would break if a new status were added.",
+  "repository": "task-service",
+  "estimated_turns": 6,
+  "expected_answers": {
+    "dependent_modules": ["types.ts", "store.ts", "cli.ts", "validation.ts"],
+    "break_if_new_status": "CLI help text lists statuses explicitly. Store countsByStatus would include new status. Validation would need updating for CLI input validation. Tests reference specific statuses."
+  },
+  "hidden_test_command": "bun test tests/hidden/comprehension.test.ts",
+  "reject_criteria": []
+}
