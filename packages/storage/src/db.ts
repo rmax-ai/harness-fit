@@ -125,6 +125,22 @@ export class HarnessDB {
     return row?.config_json ?? null;
   }
 
+  // ── Experiments ──────────────────────────────────────
+
+  saveExperiment(id: string, definition: string): void {
+    this.db.run(
+      'INSERT OR IGNORE INTO experiments (id, definition_json, status, started_at) VALUES (?, ?, ?, ?)',
+      [id, definition, 'running', new Date().toISOString()],
+    );
+  }
+
+  completeExperiment(id: string): void {
+    this.db.run(
+      'UPDATE experiments SET status = ?, completed_at = ? WHERE id = ?',
+      ['completed', new Date().toISOString(), id],
+    );
+  }
+
   // ── Runs ────────────────────────────────────────────
 
   saveRun(run: RunResult, experimentId?: string): void {

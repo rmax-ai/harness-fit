@@ -13,3 +13,12 @@ export {
 export type { ToolExecutor } from './tools/index';
 export { AgentLoop } from './runtime/agent-loop';
 export type { AgentLoopConfig, TaskContext } from './runtime/agent-loop';
+export { ExperimentCoordinator } from './experiment/coordinator';
+export type {
+  TaskDefinition,
+  ModelSpec,
+  ExperimentSpec,
+  TrialResult,
+  ExperimentResult,
+  ExperimentSummary,
+} from './experiment/coordinator';

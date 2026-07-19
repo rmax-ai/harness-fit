@@ -113,6 +113,7 @@ export class ExperimentCoordinator {
     harness: HarnessConfig,
     trialNumber: number,
     repoPath: string,
+    experimentId: string,
   ): Promise<TrialResult> {
     const runLimits: Partial<RunLimits> = {
       maxTurns: DEFAULT_LIMITS.maxTurns,
@@ -155,7 +156,7 @@ export class ExperimentCoordinator {
     const runResult = await agentLoop.execute(taskContext);
 
     // Persist to DB
-    this.db.saveRun(runResult, `exp-${Date.now()}`);
+    this.db.saveRun(runResult, experimentId);
 
     // Evaluate
     const evalInput: ScoringInput = {
@@ -200,6 +201,9 @@ export class ExperimentCoordinator {
 
   /** Run a full experiment: all models × all tasks × N trials. */
   async run(spec: ExperimentSpec): Promise<ExperimentResult> {
+    // Create experiment record
+    this.db.saveExperiment(spec.id, JSON.stringify(spec));
+
     const allResults: TrialResult[] = [];
 
     for (const model of spec.models) {
@@ -213,7 +217,7 @@ export class ExperimentCoordinator {
           await Bun.$`cp -r ${benchRepo}/* ${repoPath}/`.quiet();
 
           try {
-            const result = await this.runTrial(model, task, spec.harness, trial, repoPath);
+            const result = await this.runTrial(model, task, spec.harness, trial, repoPath, spec.id);
             allResults.push(result);
             console.log(
               `  [${model.id}/${task.id}/t${trial}] ${result.termination} (${result.score.toFixed(2)})`,

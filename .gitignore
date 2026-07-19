@@ -40,3 +40,6 @@ coverage/
 # Archives
 *.tar.gz
 *.zip
+*.db
+*.db-shm
+*.db-wal

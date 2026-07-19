@@ -1,17 +1,9 @@
 {
   "id": "bug-001-status-filter",
-  "category": "bug_repair",
+  "category": "bug",
   "difficulty": "easy",
-  "title": "Fix status filter returning incorrect results",
-  "description": "The `list --status` command returns all tasks regardless of the status filter. The bug is in the `list` method of TaskStore.",
+  "title": "Fix Status Filter in Task Service",
+  "description": "The task list command has a --status flag that should filter tasks by status (todo, in_progress, done, cancelled), but it currently ignores the flag and returns all tasks. Fix the filtering logic so that --status works correctly. The store already supports filtering — the bug is in the CLI argument handling.",
   "repository": "task-service",
-  "seeded_defect": "The filter.status check in TaskStore.list() uses a loose equality that always matches.",
-  "estimated_turns": 6,
-  "hidden_test_command": "bun test tests/hidden/status-filter.test.ts",
-  "reject_criteria": [
-    "must_not_modify_tests",
-    "must_not_disable_typecheck",
-    "must_not_introduce_any",
-    "must_not_delete_existing_tests"
-  ]
+  "hiddenTestCommand": "bun test ../../hidden-tests/bug-001-status-filter/"
 }
