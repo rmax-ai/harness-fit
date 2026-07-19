@@ -99,7 +99,7 @@ export class ExperimentCoordinator {
 
     for await (const match of glob.scan({ cwd: scanDir, absolute: true })) {
       const file = Bun.file(match);
-      const raw = await file.json() as TaskDefinition;
+      const raw = (await file.json()) as TaskDefinition;
       tasks.push(raw);
     }
 
@@ -147,7 +147,7 @@ export class ExperimentCoordinator {
       repoPath,
       taskDescription: taskPrompt,
       configHash: compiled.hash as ConfigHash,
-      seed: trialNumber * 1000 + Date.now() % 1000,
+      seed: trialNumber * 1000 + (Date.now() % 1000),
       trialNumber,
     };
 
@@ -159,9 +159,14 @@ export class ExperimentCoordinator {
 
     // Evaluate
     const evalInput: ScoringInput = {
-      functionalTests: runResult.termination === 'completed'
-        ? { passed: runResult.toolCalls > 0 ? 1 : 0, total: 1, failures: runResult.toolCalls > 0 ? [] : ['no_tool_calls'] }
-        : { passed: 0, total: 1, failures: [runResult.termination] },
+      functionalTests:
+        runResult.termination === 'completed'
+          ? {
+              passed: runResult.toolCalls > 0 ? 1 : 0,
+              total: 1,
+              failures: runResult.toolCalls > 0 ? [] : ['no_tool_calls'],
+            }
+          : { passed: 0, total: 1, failures: [runResult.termination] },
       regression: {
         typecheckPassed: false,
         lintPassed: false,
@@ -210,9 +215,13 @@ export class ExperimentCoordinator {
           try {
             const result = await this.runTrial(model, task, spec.harness, trial, repoPath);
             allResults.push(result);
-            console.log(`  [${model.id}/${task.id}/t${trial}] ${result.termination} (${result.score.toFixed(2)})`);
+            console.log(
+              `  [${model.id}/${task.id}/t${trial}] ${result.termination} (${result.score.toFixed(2)})`,
+            );
           } catch (err) {
-            console.error(`  [${model.id}/${task.id}/t${trial}] ERROR: ${err instanceof Error ? err.message : String(err)}`);
+            console.error(
+              `  [${model.id}/${task.id}/t${trial}] ERROR: ${err instanceof Error ? err.message : String(err)}`,
+            );
           } finally {
             // Cleanup sandbox
             await Bun.$`rm -rf ${repoPath}`.quiet();
@@ -233,19 +242,21 @@ export class ExperimentCoordinator {
       byTask.set(r.taskId, tl);
     }
 
-    const completed = allResults.filter(r => r.success).length;
+    const completed = allResults.filter((r) => r.success).length;
     const summary: ExperimentSummary = {
       totalRuns: allResults.length,
       completedRuns: completed,
       failedRuns: allResults.length - completed,
       overallSuccessRate: allResults.length > 0 ? completed / allResults.length : 0,
       totalCostUsd: allResults.reduce((sum, r) => sum + r.costUsd, 0),
-      avgDurationMs: allResults.length > 0
-        ? allResults.reduce((sum, r) => sum + r.durationMs, 0) / allResults.length
-        : 0,
-      avgTurns: allResults.length > 0
-        ? allResults.reduce((sum, r) => sum + r.turns, 0) / allResults.length
-        : 0,
+      avgDurationMs:
+        allResults.length > 0
+          ? allResults.reduce((sum, r) => sum + r.durationMs, 0) / allResults.length
+          : 0,
+      avgTurns:
+        allResults.length > 0
+          ? allResults.reduce((sum, r) => sum + r.turns, 0) / allResults.length
+          : 0,
     };
 
     return {

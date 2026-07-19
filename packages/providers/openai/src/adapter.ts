@@ -46,7 +46,7 @@ export class OpenAIProvider implements ModelProvider {
       throw new Error(`OpenAI API error ${response.status}: ${text}`);
     }
 
-    const data = await response.json() as Record<string, unknown>;
+    const data = (await response.json()) as Record<string, unknown>;
     return this.normalizeResponse(data);
   }
 

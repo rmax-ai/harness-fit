@@ -130,7 +130,7 @@ reporting:
 
   // Ensure .gitkeep in results
   const gitkeep = Bun.file(`${resultsDir}/.gitkeep`);
-  if (!await gitkeep.exists()) {
+  if (!(await gitkeep.exists())) {
     await Bun.write(`${resultsDir}/.gitkeep`, '');
   }
 

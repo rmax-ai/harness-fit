@@ -40,7 +40,7 @@ export class GoogleProvider implements ModelProvider {
       throw new Error(`Gemini API error ${response.status}: ${text}`);
     }
 
-    const data = await response.json() as Record<string, unknown>;
+    const data = (await response.json()) as Record<string, unknown>;
     return this.normalizeResponse(data);
   }
 
@@ -126,7 +126,9 @@ export class GoogleProvider implements ModelProvider {
     const content: MessageContent[] = [];
     const candidates = data.candidates as Record<string, unknown>[] | undefined;
     const candidate = candidates?.[0];
-    const parts = (candidate?.content as Record<string, unknown> | undefined)?.parts as Record<string, unknown>[] | undefined;
+    const parts = (candidate?.content as Record<string, unknown> | undefined)?.parts as
+      | Record<string, unknown>[]
+      | undefined;
     const finishReason = candidate?.finishReason as string | undefined;
 
     if (parts) {
