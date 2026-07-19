@@ -3,18 +3,17 @@ id: harness-fit-v1
 models:
   - id: gemini-flash
     provider: google
-    model: gemini-2.5-flash
-  - id: gpt-luna
+    model: gemini-2.0-flash-001
+  - id: gpt-mini
     provider: openai
-    model: gpt-5.6-luna
+    model: gpt-4.1-mini
   - id: claude-haiku
     provider: anthropic
-    model: claude-haiku-4-5
+    model: claude-3-5-haiku-20241022
 
 benchmark:
-  trainingSplit: train
-  developmentSplit: dev
-  testSplit: test
+  tasksDir: benchmarks/tasks
+  reposDir: benchmarks/repositories
 
 trials:
   search: 3

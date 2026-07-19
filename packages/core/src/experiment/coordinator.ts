@@ -132,6 +132,7 @@ export class ExperimentCoordinator {
     const agentConfig: AgentLoopConfig = {
       model: model.adapter,
       modelId: model.id as ModelId,
+      modelName: model.model,
       tools,
       systemPrompt: compiled.systemPrompt,
       limits: runLimits,
@@ -154,6 +155,14 @@ export class ExperimentCoordinator {
 
     // Execute
     const runResult = await agentLoop.execute(taskContext);
+
+    // Log provider errors with detail
+    if (runResult.termination === 'provider_error') {
+      const lastError = runResult.events?.find(
+        (e) => e.type === 'limit.reached' && e.data?.limit === 'provider_error'
+      );
+      console.error(`  [provider_error detail] ${lastError?.data?.error ?? 'unknown error'}`);
+    }
 
     // Persist to DB
     this.db.saveRun(runResult, experimentId);

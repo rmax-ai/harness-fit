@@ -43,3 +43,7 @@ coverage/
 *.db
 *.db-shm
 *.db-wal
+sandboxes/
+harnessfit.db
+harnessfit.db-journal
+harnessfit.db-wal

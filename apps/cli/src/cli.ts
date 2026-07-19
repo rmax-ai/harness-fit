@@ -155,7 +155,9 @@ async function cmdProvidersCheck(): Promise<void> {
 }
 
 async function cmdBaseline(args: string[]): Promise<void> {
+  const expIdx = args.indexOf('--experiment');
   const experimentPath =
+    (expIdx >= 0 ? args[expIdx + 1] : undefined) ??
     args.find((a) => a.startsWith('--experiment='))?.split('=')[1] ??
     'experiments/definitions/default.yaml';
 

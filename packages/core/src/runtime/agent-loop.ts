@@ -28,6 +28,7 @@ import { ToolRegistry } from '../tools/registry';
 export interface AgentLoopConfig {
   readonly model: ModelProvider;
   readonly modelId: ModelId;
+  readonly modelName: string;
   readonly tools: ToolRegistry;
   readonly limits?: Partial<RunLimits>;
   readonly systemPrompt: string;
@@ -45,13 +46,15 @@ export interface TaskContext {
 export class AgentLoop {
   private readonly model: ModelProvider;
   private readonly modelId: ModelId;
+  private readonly modelName: string;
   private readonly tools: ToolRegistry;
-  private readonly limits: RunLimits;
+  private readonly limits: Required<RunLimits>;
   private readonly systemPrompt: string;
 
   constructor(config: AgentLoopConfig) {
     this.model = config.model;
     this.modelId = config.modelId;
+    this.modelName = config.modelName;
     this.tools = config.tools;
     this.limits = { ...DEFAULT_LIMITS, ...config.limits };
     this.systemPrompt = config.systemPrompt;
@@ -106,7 +109,7 @@ export class AgentLoop {
         const toolDefs = this.getToolDefinitions();
 
         const request: NormalizedModelRequest = {
-          model: this.modelId,
+          model: this.modelName,
           system: this.systemPrompt,
           messages,
           tools: toolDefs,
