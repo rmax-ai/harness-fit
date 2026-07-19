@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "workspaces": ["packages/*", "packages/*/*", "apps/*"],
+  "bin": {
+    "harnessfit": "./apps/cli/src/cli.ts"
+  },
   "scripts": {
+    "harnessfit": "bun run --bun ./apps/cli/src/cli.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "format": "biome format --write .",
