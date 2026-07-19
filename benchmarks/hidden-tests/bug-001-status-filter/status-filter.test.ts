@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
-import { TaskStore } from '../../src/store';
-import { TaskStatus, TaskPriority } from '../../src/types';
+import { TaskStore } from '../../repositories/task-service/src/store';
+import { TaskStatus, TaskPriority } from '../../repositories/task-service/src/types';
 
 /**
  * Hidden acceptance tests for bug-001-status-filter.

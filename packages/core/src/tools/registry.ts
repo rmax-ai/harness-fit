@@ -1,5 +1,4 @@
-import type { ToolName, Result } from '../types/index';
-import { getToolDefinition } from './definitions';
+import type { ToolName } from '../types/index';
 
 /**
  * Tool execution interface.
@@ -20,11 +19,7 @@ export class ToolRegistry {
   }
 
   /** Execute a tool call. Returns the result string or error. */
-  async execute(
-    name: string,
-    args: Record<string, unknown>,
-    cwd: string,
-  ): Promise<string> {
+  async execute(name: string, args: Record<string, unknown>, cwd: string): Promise<string> {
     const toolName = name as ToolName;
     const executor = this.executors.get(toolName);
 
@@ -85,7 +80,15 @@ export function createDefaultRegistry(): ToolRegistry {
     const pattern = (args.pattern as string) || '';
     const searchPath = (args.path as string) || '.';
     const proc = Bun.spawnSync({
-      cmd: ['grep', '-rn', '--include=*.ts', '--include=*.json', '--include=*.md', pattern, searchPath],
+      cmd: [
+        'grep',
+        '-rn',
+        '--include=*.ts',
+        '--include=*.json',
+        '--include=*.md',
+        pattern,
+        searchPath,
+      ],
       cwd,
       stdout: 'pipe',
       stderr: 'pipe',
@@ -112,7 +115,11 @@ export function createDefaultRegistry(): ToolRegistry {
       stderr: 'pipe',
     });
     // Clean up temp file
-    try { await Bun.file(tmpFile).delete(); } catch { /* ok */ }
+    try {
+      await Bun.file(tmpFile).delete();
+    } catch {
+      /* ok */
+    }
     return proc.stdout.toString() || proc.stderr.toString() || 'Patch applied.';
   });
 

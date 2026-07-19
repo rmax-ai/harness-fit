@@ -3,17 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "packages/*",
-    "apps/*"
-  ],
+  "workspaces": ["packages/*", "packages/*/*", "apps/*"],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome ci . && bun run typecheck",
-    "test": "bun test",
-    "test:coverage": "bun test --coverage"
+    "test": "bun test packages/ apps/ benchmarks/repositories/",
+    "test:hidden": "bun test benchmarks/hidden-tests/",
+    "test:coverage": "bun test --coverage packages/ apps/ benchmarks/repositories/"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",

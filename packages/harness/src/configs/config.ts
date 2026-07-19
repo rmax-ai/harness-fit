@@ -8,7 +8,16 @@ export function validateConfig(config: unknown): config is HarnessConfig {
   if (!config || typeof config !== 'object') return false;
   const c = config as Record<string, unknown>;
 
-  const sections = ['prompt', 'planning', 'tools', 'context', 'feedback', 'validation', 'retry', 'completion'];
+  const sections = [
+    'prompt',
+    'planning',
+    'tools',
+    'context',
+    'feedback',
+    'validation',
+    'retry',
+    'completion',
+  ];
   return sections.every((section) => c[section] && typeof c[section] === 'object');
 }
 
@@ -82,17 +91,21 @@ export function getParameterKeys(): readonly ParameterKey[] {
  */
 export function getConfigValue(config: HarnessConfig, key: ParameterKey): unknown {
   const [section, field] = key.split('.') as [keyof HarnessConfig, string];
-  const obj = config[section] as Record<string, unknown>;
+  const obj = config[section] as unknown as Record<string, unknown>;
   return obj[field];
 }
 
 /**
  * Set a nested value in a config by dot-path key, returning a new config.
  */
-export function setConfigValue(config: HarnessConfig, key: ParameterKey, value: unknown): HarnessConfig {
+export function setConfigValue(
+  config: HarnessConfig,
+  key: ParameterKey,
+  value: unknown,
+): HarnessConfig {
   const [section, field] = key.split('.') as [keyof HarnessConfig, string];
   const cloned = cloneConfig(config);
-  const obj = cloned[section] as Record<string, unknown>;
+  const obj = cloned[section] as unknown as Record<string, unknown>;
   obj[field] = value;
   return cloned;
 }
@@ -113,10 +126,13 @@ function sortedKeysReplacer(_key: string, value: unknown): unknown {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     return Object.keys(value as Record<string, unknown>)
       .sort()
-      .reduce((acc, k) => {
-        (acc as Record<string, unknown>)[k] = (value as Record<string, unknown>)[k];
-        return acc;
-      }, {} as Record<string, unknown>);
+      .reduce(
+        (acc, k) => {
+          (acc as Record<string, unknown>)[k] = (value as Record<string, unknown>)[k];
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
   }
   return value;
 }

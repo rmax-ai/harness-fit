@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'bun:test';
-import { TaskCli } from '../../src/cli';
-import { TaskStore } from '../../src/store';
-import { TaskStatus } from '../../src/types';
-import { validateCreateTask } from '../../src/validation';
+import { TaskCli } from '../../repositories/task-service/src/cli';
+import { TaskStore } from '../../repositories/task-service/src/store';
+import { TaskStatus } from '../../repositories/task-service/src/types';
+import { validateCreateTask } from '../../repositories/task-service/src/validation';
 
 /**
  * Hidden acceptance tests for refactor-001-extract-validation.

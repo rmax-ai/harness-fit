@@ -11,20 +11,14 @@ import type { TestSuiteResult } from './scorer';
  */
 export interface TestRunner {
   /** Run hidden tests for a given task. Returns test results. */
-  runHiddenTests(
-    repoPath: string,
-    hiddenTestsPath: string,
-  ): Promise<TestSuiteResult>;
+  runHiddenTests(repoPath: string, hiddenTestsPath: string): Promise<TestSuiteResult>;
 }
 
 /**
  * Concrete test runner using Bun's shell API.
  */
 export class BunTestRunner implements TestRunner {
-  async runHiddenTests(
-    repoPath: string,
-    hiddenTestsPath: string,
-  ): Promise<TestSuiteResult> {
+  async runHiddenTests(repoPath: string, hiddenTestsPath: string): Promise<TestSuiteResult> {
     // Copy hidden tests to a temp location within the repo
     // (but not in the writable tree — we run from a read-only snapshot)
     const proc = Bun.spawnSync({

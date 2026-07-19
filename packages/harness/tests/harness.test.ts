@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'bun:test';
-import { GENERIC_HARNESS, PARAMETER_KEYS } from '../src/configs/types';
-import { hashConfig, diffConfigs, cloneConfig, getConfigValue, setConfigValue, getGenericConfig } from '../src/configs/config';
+import { PARAMETER_KEYS } from '../src/configs/types';
+import {
+  hashConfig,
+  diffConfigs,
+  cloneConfig,
+  getConfigValue,
+  setConfigValue,
+  getGenericConfig,
+} from '../src/configs/config';
 import { generateNeighbors } from '../src/mutations/mutations';
 
 describe('HarnessConfig', () => {

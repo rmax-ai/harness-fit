@@ -4,8 +4,14 @@
  * Normalizes Gemini's generateContent API to the common ModelProvider interface.
  */
 import type {
-  ModelProvider, NormalizedModelRequest, NormalizedModelResponse,
-  NormalizedUsage, Money, ProviderCapabilities, StopReason, MessageContent,
+  ModelProvider,
+  NormalizedModelRequest,
+  NormalizedModelResponse,
+  NormalizedUsage,
+  Money,
+  ProviderCapabilities,
+  StopReason,
+  MessageContent,
 } from '@harnessfit/core';
 
 export class GoogleProvider implements ModelProvider {
@@ -34,15 +40,13 @@ export class GoogleProvider implements ModelProvider {
       throw new Error(`Gemini API error ${response.status}: ${text}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, unknown>;
     return this.normalizeResponse(data);
   }
 
   private buildRequest(req: NormalizedModelRequest): Record<string, unknown> {
     const contents: Record<string, unknown>[] = [];
-    const systemInstruction = req.system
-      ? { parts: [{ text: req.system }] }
-      : undefined;
+    const systemInstruction = req.system ? { parts: [{ text: req.system }] } : undefined;
 
     for (const msg of req.messages) {
       if (msg.role === 'system') continue;
@@ -93,24 +97,26 @@ export class GoogleProvider implements ModelProvider {
 
     // Gemini tool declarations
     if (req.tools.length > 0) {
-      body.tools = [{
-        functionDeclarations: req.tools.map((t) => ({
-          name: t.name,
-          description: t.description,
-          parameters: {
-            type: 'object',
-            properties: Object.fromEntries(
-              Object.entries(t.parameters).map(([key, param]) => [
-                key,
-                { type: param.type.toUpperCase(), description: param.description },
-              ]),
-            ),
-            required: Object.entries(t.parameters)
-              .filter(([, p]) => p.required)
-              .map(([key]) => key),
-          },
-        })),
-      }];
+      body.tools = [
+        {
+          functionDeclarations: req.tools.map((t) => ({
+            name: t.name,
+            description: t.description,
+            parameters: {
+              type: 'object',
+              properties: Object.fromEntries(
+                Object.entries(t.parameters).map(([key, param]) => [
+                  key,
+                  { type: param.type.toUpperCase(), description: param.description },
+                ]),
+              ),
+              required: Object.entries(t.parameters)
+                .filter(([, p]) => p.required)
+                .map(([key]) => key),
+            },
+          })),
+        },
+      ];
     }
 
     return body;
@@ -120,7 +126,7 @@ export class GoogleProvider implements ModelProvider {
     const content: MessageContent[] = [];
     const candidates = data.candidates as Record<string, unknown>[] | undefined;
     const candidate = candidates?.[0];
-    const parts = candidate?.content?.parts as Record<string, unknown>[] | undefined;
+    const parts = (candidate?.content as Record<string, unknown> | undefined)?.parts as Record<string, unknown>[] | undefined;
     const finishReason = candidate?.finishReason as string | undefined;
 
     if (parts) {
@@ -140,13 +146,14 @@ export class GoogleProvider implements ModelProvider {
       }
     }
 
-    const stopReason: StopReason = finishReason === 'STOP'
-      ? 'end_turn'
-      : finishReason === 'MAX_TOKENS'
-        ? 'max_tokens'
-        : content.some((c) => c.type === 'tool_call')
-          ? 'tool_use'
-          : 'end_turn';
+    const stopReason: StopReason =
+      finishReason === 'STOP'
+        ? 'end_turn'
+        : finishReason === 'MAX_TOKENS'
+          ? 'max_tokens'
+          : content.some((c) => c.type === 'tool_call')
+            ? 'tool_use'
+            : 'end_turn';
 
     const usageMeta = data.usageMetadata as Record<string, number> | undefined;
 
@@ -165,7 +172,7 @@ export class GoogleProvider implements ModelProvider {
   estimateCost(usage: NormalizedUsage): Money {
     // Gemini 3.5 Flash pricing
     const inputPricePerM = 0.075;
-    const outputPricePerM = 0.30;
+    const outputPricePerM = 0.3;
 
     const inputCost = (usage.inputTokens / 1_000_000) * inputPricePerM;
     const outputCost = (usage.outputTokens / 1_000_000) * outputPricePerM;

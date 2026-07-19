@@ -7,10 +7,17 @@
  * The SDK can be swapped in later for better error handling and streaming.
  */
 import type {
-  ModelProvider, NormalizedModelRequest, NormalizedModelResponse,
-  NormalizedUsage, Money, ProviderCapabilities, StopReason,
-  Message, MessageContent,
-  ToolDefinition, ToolCallContent,
+  ModelProvider,
+  NormalizedModelRequest,
+  NormalizedModelResponse,
+  NormalizedUsage,
+  Money,
+  ProviderCapabilities,
+  StopReason,
+  Message,
+  MessageContent,
+  ToolDefinition,
+  ToolCallContent,
 } from '@harnessfit/core';
 
 export class OpenAIProvider implements ModelProvider {
@@ -29,7 +36,7 @@ export class OpenAIProvider implements ModelProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify(body),
     });
@@ -39,7 +46,7 @@ export class OpenAIProvider implements ModelProvider {
       throw new Error(`OpenAI API error ${response.status}: ${text}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, unknown>;
     return this.normalizeResponse(data);
   }
 
@@ -80,7 +87,11 @@ export class OpenAIProvider implements ModelProvider {
       }
     }
 
-    return { role: msg.role, content: parts, tool_calls: toolCalls.length > 0 ? toolCalls : undefined };
+    return {
+      role: msg.role,
+      content: parts,
+      tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+    };
   }
 
   private convertTool(tool: ToolDefinition): Record<string, unknown> {
@@ -130,9 +141,8 @@ export class OpenAIProvider implements ModelProvider {
           type: 'tool_call',
           id: tc.id as string,
           name: fn?.name as string,
-          arguments: typeof fn?.arguments === 'string'
-            ? JSON.parse(fn.arguments)
-            : (fn?.arguments || {}),
+          arguments:
+            typeof fn?.arguments === 'string' ? JSON.parse(fn.arguments) : fn?.arguments || {},
         } as ToolCallContent);
       }
     }
@@ -157,7 +167,7 @@ export class OpenAIProvider implements ModelProvider {
 
   estimateCost(usage: NormalizedUsage): Money {
     // GPT-5.6 Luna pricing (approximate — replace with actual)
-    const inputPricePerM = 2.0;  // $2 per million input tokens
+    const inputPricePerM = 2.0; // $2 per million input tokens
     const outputPricePerM = 8.0; // $8 per million output tokens
 
     const inputCost = (usage.inputTokens / 1_000_000) * inputPricePerM;

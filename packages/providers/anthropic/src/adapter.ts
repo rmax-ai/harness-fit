@@ -4,8 +4,16 @@
  * Normalizes Anthropic's Messages API to the common ModelProvider interface.
  */
 import type {
-  ModelProvider, NormalizedModelRequest, NormalizedModelResponse,
-  NormalizedUsage, Money, ProviderCapabilities, StopReason, MessageContent,
+  ModelProvider,
+  NormalizedModelRequest,
+  NormalizedModelResponse,
+  NormalizedUsage,
+  Money,
+  ProviderCapabilities,
+  StopReason,
+  Message,
+  MessageContent,
+  ToolDefinition,
 } from '@harnessfit/core';
 
 export class AnthropicProvider implements ModelProvider {
@@ -35,7 +43,7 @@ export class AnthropicProvider implements ModelProvider {
       throw new Error(`Anthropic API error ${response.status}: ${text}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, unknown>;
     return this.normalizeResponse(data);
   }
 
@@ -44,14 +52,17 @@ export class AnthropicProvider implements ModelProvider {
     const body: Record<string, unknown> = {
       model: req.model,
       system: req.system,
-      messages: req.messages
+      messages: (req.messages as Message[])
         .filter((m) => m.role !== 'system')
-        .map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : this.convertContent(m.content) })),
+        .map((m) => ({
+          role: m.role,
+          content: typeof m.content === 'string' ? m.content : this.convertContent(m.content),
+        })),
       max_tokens: req.maxOutputTokens,
     };
 
     if (req.tools.length > 0) {
-      body.tools = req.tools.map((t) => ({
+      body.tools = req.tools.map((t: ToolDefinition) => ({
         name: t.name,
         description: t.description,
         input_schema: {
@@ -59,10 +70,16 @@ export class AnthropicProvider implements ModelProvider {
           properties: Object.fromEntries(
             Object.entries(t.parameters).map(([key, param]) => [
               key,
-              { type: param.type, description: param.description, ...(param.enum ? { enum: param.enum } : {}) },
+              {
+                type: param.type,
+                description: param.description,
+                ...(param.enum ? { enum: param.enum } : {}),
+              },
             ]),
           ),
-          required: Object.entries(t.parameters).filter(([, p]) => p.required).map(([key]) => key),
+          required: Object.entries(t.parameters)
+            .filter(([, p]) => p.required)
+            .map(([key]) => key),
         },
       }));
     }
@@ -106,9 +123,11 @@ export class AnthropicProvider implements ModelProvider {
     }
 
     const stopReason: StopReason =
-      data.stop_reason === 'tool_use' ? 'tool_use' :
-      data.stop_reason === 'max_tokens' ? 'max_tokens' :
-      'end_turn';
+      data.stop_reason === 'tool_use'
+        ? 'tool_use'
+        : data.stop_reason === 'max_tokens'
+          ? 'max_tokens'
+          : 'end_turn';
 
     const usage = data.usage as Record<string, number> | undefined;
 
@@ -126,7 +145,7 @@ export class AnthropicProvider implements ModelProvider {
 
   estimateCost(usage: NormalizedUsage): Money {
     // Claude Haiku 4.5 pricing
-    const inputPricePerM = 0.80;
+    const inputPricePerM = 0.8;
     const outputPricePerM = 4.0;
 
     const inputCost = (usage.inputTokens / 1_000_000) * inputPricePerM;

@@ -13,7 +13,11 @@ import type { ConstraintResult } from './scorer';
  * - Replaced implementation with hardcoded outputs
  */
 export interface ConstraintChecker {
-  check(repoPath: string, patch: string, changedFiles: readonly string[]): Promise<ConstraintResult>;
+  check(
+    repoPath: string,
+    patch: string,
+    changedFiles: readonly string[],
+  ): Promise<ConstraintResult>;
 }
 
 export class BunConstraintChecker implements ConstraintChecker {

@@ -1,1 +1,1 @@
-// @harnessfit/providers-openai
+export { OpenAIProvider } from './adapter';

@@ -1,5 +1,4 @@
 import type { HarnessConfig } from '@harnessfit/harness';
-import type { RunResult } from '@harnessfit/core';
 
 /**
  * Hill-climbing optimizer per SPEC.md §12.
@@ -123,7 +122,10 @@ export function isCredibleImprovement(
 /**
  * Bootstrap confidence interval (placeholder — full implementation V2).
  */
-export function bootstrapCI(values: readonly number[], confidence: number = 0.95): [number, number] {
+export function bootstrapCI(
+  values: readonly number[],
+  confidence: number = 0.95,
+): [number, number] {
   if (values.length === 0) return [0, 0];
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
   // Simple ±2 standard error (placeholder for actual bootstrap)

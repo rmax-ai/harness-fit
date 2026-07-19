@@ -1,1 +1,1 @@
-// @harnessfit/providers-anthropic
+export { AnthropicProvider } from './adapter';

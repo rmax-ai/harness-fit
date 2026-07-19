@@ -13,7 +13,11 @@ export const TOOL_DEFINITIONS: Record<ToolName, ToolDefinition> = {
     name: 'list_files',
     description: 'List files and directories in a given path.',
     parameters: {
-      path: { type: 'string', description: 'Directory path to list (relative to repo root).', required: true },
+      path: {
+        type: 'string',
+        description: 'Directory path to list (relative to repo root).',
+        required: true,
+      },
       recursive: { type: 'boolean', description: 'Whether to list recursively.' },
     },
   },
@@ -21,7 +25,11 @@ export const TOOL_DEFINITIONS: Record<ToolName, ToolDefinition> = {
     name: 'read_file',
     description: 'Read the contents of a file.',
     parameters: {
-      path: { type: 'string', description: 'File path to read (relative to repo root).', required: true },
+      path: {
+        type: 'string',
+        description: 'File path to read (relative to repo root).',
+        required: true,
+      },
       offset: { type: 'number', description: 'Line number to start reading from (1-indexed).' },
       limit: { type: 'number', description: 'Maximum number of lines to read.' },
     },
@@ -32,8 +40,15 @@ export const TOOL_DEFINITIONS: Record<ToolName, ToolDefinition> = {
     parameters: {
       pattern: { type: 'string', description: 'Regex pattern to search for.', required: true },
       path: { type: 'string', description: 'Directory to search in.' },
-      fileTypes: { type: 'string', description: 'Comma-separated file extensions (e.g., ".ts,.json").' },
-      outputMode: { type: 'string', enum: ['content', 'files_with_matches', 'count'], description: 'Output mode.' },
+      fileTypes: {
+        type: 'string',
+        description: 'Comma-separated file extensions (e.g., ".ts,.json").',
+      },
+      outputMode: {
+        type: 'string',
+        enum: ['content', 'files_with_matches', 'count'],
+        description: 'Output mode.',
+      },
     },
   },
   write_file: {

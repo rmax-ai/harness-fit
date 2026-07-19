@@ -263,8 +263,8 @@ describe('computeScore integration', () => {
     const result = computeScore(input);
     expect(result.functional).toBe(0.5);
     expect(result.regression).toBe(0.875); // 0.5*(15/20) + 0.25 + 0.25
-    expect(result.constraint).toBe(0.8);   // 1.0 - 0.2
-    expect(result.quality).toBe(0.95);      // 1.0 - 0.05
+    expect(result.constraint).toBe(0.8); // 1.0 - 0.2
+    expect(result.quality).toBe(0.95); // 1.0 - 0.05
     expect(result.total).toBe(0.6125);
     // 0.70*0.5 + 0.10*0.875 + 0.10*0.8 + 0.10*0.95
     // = 0.35 + 0.0875 + 0.08 + 0.095 = 0.6125

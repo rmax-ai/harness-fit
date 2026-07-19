@@ -14,7 +14,9 @@ export interface PatchQualityAnalyzer {
 
 export class BunPatchQualityAnalyzer implements PatchQualityAnalyzer {
   async analyze(repoPath: string, patch: string): Promise<PatchQualityMetrics> {
-    const lineCount = patch.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).length;
+    const lineCount = patch
+      .split('\n')
+      .filter((l) => l.startsWith('+') && !l.startsWith('+++')).length;
 
     // Check for obvious duplication (consecutive identical added lines)
     const addedLines = patch

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'bun:test';
-import { TaskCli } from '../../src/cli';
-import { TaskStore } from '../../src/store';
-import { TaskStatus } from '../../src/types';
+import { TaskCli } from '../../repositories/task-service/src/cli';
+import { TaskStore } from '../../repositories/task-service/src/store';
+import { TaskStatus } from '../../repositories/task-service/src/types';
 
 /**
  * Hidden acceptance tests for bug-002-type-error.

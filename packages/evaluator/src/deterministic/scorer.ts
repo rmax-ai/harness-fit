@@ -1,4 +1,4 @@
-import type { TaskScore, ScoreDetails, RunResult } from './types';
+import type { TaskScore } from './types';
 
 /**
  * Deterministic scoring engine per SPEC.md §14.
@@ -15,10 +15,10 @@ import type { TaskScore, ScoreDetails, RunResult } from './types';
  */
 
 const WEIGHTS = {
-  functional: 0.70,
-  regression: 0.10,
-  constraint: 0.10,
-  quality: 0.10,
+  functional: 0.7,
+  regression: 0.1,
+  constraint: 0.1,
+  quality: 0.1,
 } as const;
 
 /**
@@ -77,9 +77,9 @@ export function computeScore(input: ScoringInput): TaskScore {
 
   const total = round(
     WEIGHTS.functional * functional +
-    WEIGHTS.regression * regression +
-    WEIGHTS.constraint * constraint +
-    WEIGHTS.quality * quality,
+      WEIGHTS.regression * regression +
+      WEIGHTS.constraint * constraint +
+      WEIGHTS.quality * quality,
   );
 
   return {

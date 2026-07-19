@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'bun:test';
-import { TaskCli } from '../../src/cli';
-import { TaskStore } from '../../src/store';
-import { TaskPriority } from '../../src/types';
+import { TaskCli } from '../../repositories/task-service/src/cli';
+import { TaskStore } from '../../repositories/task-service/src/store';
+import { TaskPriority } from '../../repositories/task-service/src/types';
 
 describe('feat-001-priority-filter — Hidden Acceptance', () => {
   it('filters by priority alone', () => {

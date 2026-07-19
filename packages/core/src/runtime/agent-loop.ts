@@ -1,7 +1,16 @@
 import type {
-  ModelProvider, NormalizedModelRequest, Message, MessageContent,
-  RunLimits, RunTermination, RunResult, RunId, ModelId, TaskId,
-  ConfigHash, FailureLabel, ToolDefinition, NormalizedModelResponse,
+  ModelProvider,
+  NormalizedModelRequest,
+  Message,
+  MessageContent,
+  RunLimits,
+  RunTermination,
+  RunResult,
+  ModelId,
+  TaskId,
+  ConfigHash,
+  ToolDefinition,
+  NormalizedModelResponse,
 } from '../types/index';
 import { DEFAULT_LIMITS, createRunId } from '../types/index';
 import { EventStore } from '../events/event-store';
@@ -215,7 +224,6 @@ export class AgentLoop {
         termination = 'turn_limit';
         events.emit('limit.reached', { limit: 'turns', count: turns });
       }
-
     } catch (err) {
       termination = 'internal_error';
       events.emit('limit.reached', {

@@ -1,1 +1,1 @@
-// @harnessfit/providers-google
+export { GoogleProvider } from './adapter';

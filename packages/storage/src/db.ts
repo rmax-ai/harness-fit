@@ -102,23 +102,26 @@ export class HarnessDB {
   // ── Models ──────────────────────────────────────────
 
   registerModel(id: string, provider: string, model: string): void {
-    this.db.run(
-      'INSERT OR REPLACE INTO models (id, provider, model) VALUES (?, ?, ?)',
-      [id, provider, model],
-    );
+    this.db.run('INSERT OR REPLACE INTO models (id, provider, model) VALUES (?, ?, ?)', [
+      id,
+      provider,
+      model,
+    ]);
   }
 
   // ── Harness Configs ─────────────────────────────────
 
   saveConfig(hash: string, configJson: string): void {
-    this.db.run(
-      'INSERT OR IGNORE INTO harness_configs (hash, config_json) VALUES (?, ?)',
-      [hash, configJson],
-    );
+    this.db.run('INSERT OR IGNORE INTO harness_configs (hash, config_json) VALUES (?, ?)', [
+      hash,
+      configJson,
+    ]);
   }
 
   getConfig(hash: string): string | null {
-    const row = this.db.query('SELECT config_json FROM harness_configs WHERE hash = ?').get(hash) as { config_json: string } | undefined;
+    const row = this.db.query('SELECT config_json FROM harness_configs WHERE hash = ?').get(hash) as
+      | { config_json: string }
+      | undefined;
     return row?.config_json ?? null;
   }
 
@@ -177,12 +180,19 @@ export class HarnessDB {
   }
 
   getRun(runId: string): RunResult | null {
-    const row = this.db.query('SELECT * FROM runs WHERE id = ?').get(runId) as Record<string, unknown> | undefined;
+    const row = this.db.query('SELECT * FROM runs WHERE id = ?').get(runId) as
+      | Record<string, unknown>
+      | undefined;
     if (!row) return null;
 
-    const events = this.db.query(
-      'SELECT * FROM run_events WHERE run_id = ? ORDER BY sequence_number',
-    ).all(runId) as { type: string; sequence_number: number; timestamp: string; data_json: string }[];
+    const events = this.db
+      .query('SELECT * FROM run_events WHERE run_id = ? ORDER BY sequence_number')
+      .all(runId) as {
+      type: string;
+      sequence_number: number;
+      timestamp: string;
+      data_json: string;
+    }[];
 
     return {
       runId: row.id as string,
@@ -203,25 +213,31 @@ export class HarnessDB {
       outputTokens: row.output_tokens as number,
       cachedTokens: row.cached_tokens as number,
       costUsd: row.cost_usd as number,
-      events: events.map((e) => ({
-        type: e.type as RunEvent['type'],
-        runId: row.id as string,
-        sequenceNumber: e.sequence_number,
-        timestamp: e.timestamp,
-        data: JSON.parse(e.data_json),
-      } as RunEvent)),
-    } as RunResult;
+      events: events.map(
+        (e) =>
+          ({
+            type: e.type as RunEvent['type'],
+            runId: row.id as string,
+            sequenceNumber: e.sequence_number,
+            timestamp: e.timestamp,
+            data: JSON.parse(e.data_json),
+          }) as RunEvent,
+      ),
+    } as unknown as RunResult;
   }
 
   /** Get all runs for an experiment. */
   getExperimentRuns(experimentId: string): readonly RunResult[] {
-    const rows = this.db.query('SELECT id FROM runs WHERE experiment_id = ?').all(experimentId) as { id: string }[];
+    const rows = this.db.query('SELECT id FROM runs WHERE experiment_id = ?').all(experimentId) as {
+      id: string;
+    }[];
     return rows.map((r) => this.getRun(r.id)).filter((r): r is RunResult => r !== null);
   }
 
   /** Get aggregate metrics for an experiment. */
   getExperimentSummary(experimentId: string): ExperimentSummary {
-    const row = this.db.query(`
+    const row = this.db
+      .query(`
       SELECT
         COUNT(*) as total_runs,
         SUM(CASE WHEN termination = 'completed' THEN 1 ELSE 0 END) as completed,
@@ -231,9 +247,19 @@ export class HarnessDB {
         AVG(duration_ms) as avg_duration,
         AVG(turns) as avg_turns
       FROM runs WHERE experiment_id = ?
-    `).get(experimentId) as Record<string, number | null> | undefined;
+    `)
+      .get(experimentId) as Record<string, number | null> | undefined;
 
-    if (!row) return { totalRuns: 0, completed: 0, failed: 0, avgCost: 0, totalCost: 0, avgDurationMs: 0, avgTurns: 0 };
+    if (!row)
+      return {
+        totalRuns: 0,
+        completed: 0,
+        failed: 0,
+        avgCost: 0,
+        totalCost: 0,
+        avgDurationMs: 0,
+        avgTurns: 0,
+      };
 
     return {
       totalRuns: row.total_runs ?? 0,

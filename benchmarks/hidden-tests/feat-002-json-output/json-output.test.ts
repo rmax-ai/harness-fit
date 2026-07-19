@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
-import { TaskCli } from '../../src/cli';
-import { TaskStore } from '../../src/store';
+import { TaskCli } from '../../repositories/task-service/src/cli';
+import { TaskStore } from '../../repositories/task-service/src/store';
 
 describe('feat-002-json-output — Hidden Acceptance', () => {
   it('list --json returns valid JSON array', () => {

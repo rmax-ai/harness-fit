@@ -1,6 +1,17 @@
-import type { HarnessConfig, PromptConfig, ToolConfig, ValidationConfig, RetryConfig } from '../configs/types';
+import type {
+  HarnessConfig,
+  PromptConfig,
+  ToolConfig,
+  ValidationConfig,
+  RetryConfig,
+} from '../configs/types';
 import type { ToolDefinition } from '@harnessfit/core';
-import type { ToolDescriptionStyle, ValidationMode, RetryMode, PlanningMode } from '../configs/types';
+import type {
+  ToolDescriptionStyle,
+  ValidationMode,
+  RetryMode,
+  PlanningMode,
+} from '../configs/types';
 
 /**
  * Compiled harness — the runtime artifact produced by the compiler.
@@ -62,7 +73,9 @@ function buildSystemPrompt(prompt: PromptConfig): string {
 
   switch (prompt.instructionStyle) {
     case 'minimal':
-      parts.push('You are an AI coding agent. Complete the task using the available tools. Be concise.');
+      parts.push(
+        'You are an AI coding agent. Complete the task using the available tools. Be concise.',
+      );
       break;
     case 'contract':
       parts.push('You are an AI coding agent. Your task is clearly defined below.');
@@ -87,15 +100,21 @@ function buildSystemPrompt(prompt: PromptConfig): string {
   }
 
   if (prompt.includeExamples) {
-    parts.push('\nExample workflow: read relevant files → identify the fix → apply changes → run tests → report.');
+    parts.push(
+      '\nExample workflow: read relevant files → identify the fix → apply changes → run tests → report.',
+    );
   }
 
   if (prompt.repeatConstraints) {
-    parts.push('\nCONSTRAINTS: Do not modify test files. Do not add dependencies. Preserve the public API. Run tests before finishing.');
+    parts.push(
+      '\nCONSTRAINTS: Do not modify test files. Do not add dependencies. Preserve the public API. Run tests before finishing.',
+    );
   }
 
   if (prompt.explicitSuccessCriteria) {
-    parts.push('\nSuccess criteria: All existing tests pass. TypeScript compiles without errors. The task requirements are fully met.');
+    parts.push(
+      '\nSuccess criteria: All existing tests pass. TypeScript compiles without errors. The task requirements are fully met.',
+    );
   }
 
   const body = parts.join('\n');
@@ -153,8 +172,12 @@ function buildRuntimePolicy(config: HarnessConfig): RuntimePolicy {
     requirePlanBeforeTools: config.planning.requirePlanBeforeTools,
     maxPlanItems: config.planning.maxPlanItems,
     maxContextTokens: config.context.maxContextTokens,
-    toolResultCompaction: config.context.toolResultCompaction === 'summarize' ? 'summarize' :
-      config.context.toolResultCompaction === 'truncate' ? 'truncate' : 'none',
+    toolResultCompaction:
+      config.context.toolResultCompaction === 'summarize'
+        ? 'summarize'
+        : config.context.toolResultCompaction === 'truncate'
+          ? 'truncate'
+          : 'none',
   };
 }
 
