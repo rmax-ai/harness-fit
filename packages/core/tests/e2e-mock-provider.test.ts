@@ -16,7 +16,6 @@ import type {
   TaskId,
   ConfigHash,
 } from '../src/types/index';
-import { createRunId } from '../src/types/index';
 import type { AgentLoopConfig, TaskContext } from '../src/runtime/agent-loop';
 import { AgentLoop } from '../src/runtime/agent-loop';
 import { createDefaultRegistry, getToolDefinitions } from '../src/tools/index';

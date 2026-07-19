@@ -21,13 +21,13 @@ export class BunTestRunner implements TestRunner {
   async runHiddenTests(repoPath: string, hiddenTestsPath: string): Promise<TestSuiteResult> {
     // Copy hidden tests to a temp location within the repo
     // (but not in the writable tree — we run from a read-only snapshot)
-    const proc = Bun.spawnSync({
-      cmd: ['bun', 'test', '--reporter', 'json'],
+    const env: Record<string, string> = {};
+    if (Bun.env.HIDDEN_TESTS_PATH) env.HIDDEN_TESTS_PATH = Bun.env.HIDDEN_TESTS_PATH;
+    env.HIDDEN_TESTS_PATH = hiddenTestsPath;
+
+    const proc = Bun.spawnSync(['bun', 'test', '--reporter', 'json'], {
       cwd: repoPath,
-      env: {
-        ...Bun.env,
-        HIDDEN_TESTS_PATH: hiddenTestsPath,
-      },
+      env,
       stdout: 'pipe',
       stderr: 'pipe',
     });
