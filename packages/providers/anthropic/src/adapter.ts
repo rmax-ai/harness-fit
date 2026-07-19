@@ -48,16 +48,45 @@ export class AnthropicProvider implements ModelProvider {
   }
 
   private buildRequest(req: NormalizedModelRequest): Record<string, unknown> {
-    // Anthropic separates system from messages
+    // Anthropic separates system from messages.
+    // Tool result messages must be merged into a single user message
+    // following the assistant message with tool_use blocks.
+    const anthropicMessages: Record<string, unknown>[] = [];
+    let pendingToolResults: Record<string, unknown>[] = [];
+
+    for (const m of req.messages as Message[]) {
+      if (m.role === 'system') continue;
+
+      if (m.role === 'tool') {
+        // Collect tool results; flush as one user message later
+        const content = typeof m.content === 'string'
+          ? [{ type: 'text', text: m.content }]
+          : this.convertContent(m.content);
+        if (Array.isArray(content)) {
+          pendingToolResults.push(...(content as Record<string, unknown>[]));
+        }
+      } else {
+        // Flush any pending tool results before this message
+        if (pendingToolResults.length > 0) {
+          anthropicMessages.push({ role: 'user', content: pendingToolResults });
+          pendingToolResults = [];
+        }
+        anthropicMessages.push({
+          role: m.role,
+          content: typeof m.content === 'string' ? m.content : this.convertContent(m.content),
+        });
+      }
+    }
+
+    // Flush remaining tool results
+    if (pendingToolResults.length > 0) {
+      anthropicMessages.push({ role: 'user', content: pendingToolResults });
+    }
+
     const body: Record<string, unknown> = {
       model: req.model,
       system: req.system,
-      messages: (req.messages as Message[])
-        .filter((m) => m.role !== 'system')
-        .map((m) => ({
-          role: m.role === 'tool' ? 'user' : m.role,
-          content: typeof m.content === 'string' ? m.content : this.convertContent(m.content),
-        })),
+      messages: anthropicMessages,
       max_tokens: req.maxOutputTokens,
     };
 
@@ -90,8 +119,16 @@ export class AnthropicProvider implements ModelProvider {
   private convertContent(content: readonly MessageContent[]): unknown {
     const parts: Record<string, unknown>[] = [];
     for (const part of content) {
-      if (part.type === 'text') parts.push({ type: 'text', text: part.text });
-      if (part.type === 'tool_result') {
+      if (part.type === 'text') {
+        parts.push({ type: 'text', text: part.text });
+      } else if (part.type === 'tool_call') {
+        parts.push({
+          type: 'tool_use',
+          id: part.id,
+          name: part.name,
+          input: part.arguments,
+        });
+      } else if (part.type === 'tool_result') {
         parts.push({
           type: 'tool_result',
           tool_use_id: part.toolCallId,
