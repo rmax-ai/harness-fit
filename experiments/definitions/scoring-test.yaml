@@ -1,0 +1,39 @@
+id: harness-fit-scoring-test
+
+models:
+  - id: gpt-mini
+    provider: openai
+    model: gpt-4.1-mini
+
+benchmark:
+  tasksDir: benchmarks/tasks
+  reposDir: benchmarks/repositories
+
+trials:
+  search: 1
+  finalists: 1
+  headline: 1
+
+optimizer:
+  algorithm: coordinate-hill-climbing
+  randomRestarts: 1
+  maximumCandidatesPerModel: 10
+  minimumSuccessImprovement: 0.03
+
+limits:
+  maxTurns: 12
+  maxToolCalls: 20
+  maxWallTimeSeconds: 300
+  maxCostUsdPerRun: 3
+
+objective:
+  successWeight: 1.0
+  costWeight: 0.10
+  latencyWeight: 0.05
+  varianceWeight: 0.10
+
+reporting:
+  transferMatrix: false
+  ablations: false
+  paretoFrontiers: false
+  confidenceIntervals: false

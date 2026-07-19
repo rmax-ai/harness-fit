@@ -55,7 +55,7 @@ export class AnthropicProvider implements ModelProvider {
       messages: (req.messages as Message[])
         .filter((m) => m.role !== 'system')
         .map((m) => ({
-          role: m.role,
+          role: m.role === 'tool' ? 'user' : m.role,
           content: typeof m.content === 'string' ? m.content : this.convertContent(m.content),
         })),
       max_tokens: req.maxOutputTokens,

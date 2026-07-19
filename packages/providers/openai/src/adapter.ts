@@ -65,6 +65,19 @@ export class OpenAIProvider implements ModelProvider {
       return { role: msg.role, content: msg.content };
     }
 
+    // Tool result messages — OpenAI expects flat { role, tool_call_id, content }
+    if (msg.role === 'tool') {
+      const toolResult = msg.content.find((c) => c.type === 'tool_result');
+      if (toolResult && toolResult.type === 'tool_result') {
+        return {
+          role: 'tool',
+          tool_call_id: toolResult.toolCallId,
+          content: toolResult.result,
+        };
+      }
+      return { role: 'tool', content: '' };
+    }
+
     // Multi-part content
     const parts: Record<string, unknown>[] = [];
     const toolCalls: Record<string, unknown>[] = [];
@@ -82,7 +95,7 @@ export class OpenAIProvider implements ModelProvider {
           });
           break;
         case 'tool_result':
-          // OpenAI expects tool results in a separate message with role 'tool'
+          // Handled above for role='tool'; skip for other roles
           break;
       }
     }
