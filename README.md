@@ -46,6 +46,9 @@ bun run typecheck
 # Initialize experiment workspace
 bun harnessfit init
 
+# Existing configs are preserved; overwrite the generated default only when intended
+bun harnessfit init --force
+
 # Set API keys
 cp .env.example .envrc
 direnv allow

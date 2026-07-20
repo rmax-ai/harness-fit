@@ -14,7 +14,7 @@ const USAGE = `
 HarnessFit — Automatic Discovery of Model-Specific Agent Harness Profiles
 
 Commands:
-  init                  Initialize a new experiment workspace
+  init [--force]        Initialize an experiment workspace
   providers check       Validate provider API credentials
   baseline              Run baseline experiment
   optimize              Run hill-climbing optimization
@@ -31,7 +31,7 @@ async function main(): Promise<void> {
 
   switch (command) {
     case 'init': {
-      await cmdInit();
+      await cmdInit(args.slice(1));
       break;
     }
     case 'providers':
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   }
 }
 
-async function cmdInit(): Promise<void> {
+async function cmdInit(args: readonly string[]): Promise<void> {
   const experimentsDir = 'experiments';
   const definitionsDir = `${experimentsDir}/definitions`;
   const resultsDir = `${experimentsDir}/results`;
@@ -121,7 +121,13 @@ reporting:
 `;
 
   const configPath = `${definitionsDir}/default.yaml`;
-  await Bun.write(configPath, defaultConfig);
+  const configFile = Bun.file(configPath);
+  const force = args.includes('--force');
+  const configExists = await configFile.exists();
+
+  if (!configExists || force) {
+    await Bun.write(configPath, defaultConfig);
+  }
 
   const gitkeep = Bun.file(`${resultsDir}/.gitkeep`);
   if (!(await gitkeep.exists())) {
@@ -129,7 +135,11 @@ reporting:
   }
 
   console.log('✓ Initialized HarnessFit experiment directory');
-  console.log(`  Config: ${configPath}`);
+  if (configExists && !force) {
+    console.log(`  Config: ${configPath} (preserved; use --force to overwrite)`);
+  } else {
+    console.log(`  Config: ${configPath}`);
+  }
   console.log(`  Results: ${resultsDir}/`);
   console.log('');
   console.log('Next steps:');
