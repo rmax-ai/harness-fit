@@ -92,7 +92,7 @@ The central output is the **transfer matrix** — showing whether harnesses are 
 | `apps/cli/` | Command-line interface |
 | `apps/dashboard/` | Static HTML experiment dashboard (coming soon) |
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full system design.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for full system design.
 
 ---
 
@@ -102,10 +102,10 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full system design.
 |----------|---------|
 | [SPEC.md](SPEC.md) | Authoritative specification (38 sections) |
 | [TODO.md](TODO.md) | Remaining work items |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture and component design |
-| [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) | Threat analysis and validity controls |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Phased implementation plan |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | Design rationale and trade-offs |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture and component design |
+| [THREAT_MODEL.md](THREAT_MODEL.md) | Threat analysis and validity controls |
+| [ROADMAP.md](ROADMAP.md) | Phased implementation plan |
+| [DECISIONS.md](DECISIONS.md) | Design rationale and trade-offs |
 
 ---
 

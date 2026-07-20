@@ -13,7 +13,7 @@ This document captures the conventions that all contributors and AI coding agent
 
 ## 2. Code Organisation
 
-- Monorepo with `apps/` and `packages/`. See `docs/ARCHITECTURE.md` for full layout.
+- Monorepo with `apps/` and `packages/`. See `ARCHITECTURE.md` for full layout.
 - `packages/core/` has zero provider dependencies. It defines types, runtime, tools, and events.
 - `packages/providers/` contains one adapter per provider. Each adapter is a self-contained module.
 - `apps/cli/` is the entry point. Thin — delegates to packages.
@@ -105,12 +105,12 @@ These come from SPEC.md and are not up for debate:
 ## 12. References
 
 - `SPEC.md` — Authoritative specification (38 sections)
-- `docs/ARCHITECTURE.md` — System architecture and component design
-- `docs/THREAT_MODEL.md` — Threat analysis and validity controls
-- `docs/ROADMAP.md` — Phased implementation plan
-- `docs/DECISIONS.md` — Design rationale and rejected alternatives
-- `docs/RESEARCH.md` — Stack research: Bun, TypeScript, SQLite, provider SDKs
-- `docs/TS_DEVELOPMENT.md` — Day-to-day TS patterns: async, errors, testing, logging
-- `docs/TS_API_DESIGN.md` — Type design: interfaces, branded types, Result, configs
-- `docs/TS_SYSTEM_DESIGN_PATTERNS.md` — Domain patterns: agent loop, adapter, compiler, event store
-- `docs/TS_ARCHITECTURE.md` — Monorepo layout, module boundaries, dependency direction
+- `ARCHITECTURE.md` — System architecture and component design
+- `THREAT_MODEL.md` — Threat analysis and validity controls
+- `ROADMAP.md` — Phased implementation plan
+- `DECISIONS.md` — Design rationale and rejected alternatives
+- `RESEARCH.md` — Stack research: Bun, TypeScript, SQLite, provider SDKs
+- `TS_DEVELOPMENT.md` — Day-to-day TS patterns: async, errors, testing, logging
+- `TS_API_DESIGN.md` — Type design: interfaces, branded types, Result, configs
+- `TS_SYSTEM_DESIGN_PATTERNS.md` — Domain patterns: agent loop, adapter, compiler, event store
+- `TS_ARCHITECTURE.md` — Monorepo layout, module boundaries, dependency direction

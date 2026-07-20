@@ -85,7 +85,8 @@ harness-fit/
 │   ├── definitions/      # YAML experiment configs
 │   └── results/          # Experiment output
 ├── scripts/              # Dev/CI scripts
-├── docs/                 # Documentation
+├── site/                 # Landing page (SvelteKit)
+├── docs/                 # GitHub Pages build output
 └── SPEC.md               # Ground truth
 ```
 
