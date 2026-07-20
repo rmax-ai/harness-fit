@@ -36,8 +36,8 @@ export const FEATURES = [
 ];
 
 export const METRICS = [
-  { label: "89 tests", desc: "Unit + integration tests across 7 modules" },
-  { label: "0 type errors", desc: "Full strict TypeScript with branded types" },
+  { label: "91 tests", desc: "Unit + integration tests across 7 modules" },
+  { label: "0 type errors", desc: "Full strict TypeScript (source packages)" },
   { label: "37 parameters", desc: "Tunable harness dimensions for optimization" },
   { label: "3 providers", desc: "OpenAI · Anthropic · Google Gemini adapters" },
 ];

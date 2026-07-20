@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": ["node_modules", "dist", "benchmarks/repositories", "experiments/results", "*.lockb"]
+    "ignore": ["node_modules", "dist", ".svelte-kit", "benchmarks/repositories", "experiments/results", "*.lockb"]
   },
   "formatter": {
     "enabled": true,
