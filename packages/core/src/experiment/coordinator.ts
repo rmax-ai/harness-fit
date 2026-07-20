@@ -11,6 +11,12 @@ import type { AgentLoopConfig, TaskContext } from '@harnessfit/core';
 import type { ConfigHash, ModelId, RunLimits, TaskId } from '@harnessfit/core';
 import { computeScore } from '@harnessfit/evaluator';
 import type { ScoringInput } from '@harnessfit/evaluator';
+import {
+  createConstraintChecker,
+  createPatchQualityAnalyzer,
+  createRegressionChecker,
+  createTestRunner,
+} from '@harnessfit/evaluator';
 import type { HarnessConfig } from '@harnessfit/harness';
 import { compileHarness } from '@harnessfit/harness';
 import { HarnessDB } from '@harnessfit/storage';
@@ -25,6 +31,7 @@ export interface TaskDefinition {
   readonly description: string;
   readonly repository: string;
   readonly hiddenTestCommand?: string;
+  readonly hiddenTestsPath: string;
 }
 
 export interface ModelSpec {
@@ -93,8 +100,8 @@ export class ExperimentCoordinator {
 
     for await (const match of glob.scan({ cwd: scanDir, absolute: true })) {
       const file = Bun.file(match);
-      const raw = (await file.json()) as TaskDefinition;
-      tasks.push(raw);
+      const raw = (await file.json()) as Omit<TaskDefinition, 'hiddenTestsPath'>;
+      tasks.push({ ...raw, hiddenTestsPath: `benchmarks/hidden-tests/${raw.id}` });
     }
 
     return tasks;
@@ -143,41 +150,48 @@ export class ExperimentCoordinator {
     // Execute
     const runResult = await agentLoop.execute(taskContext);
 
-    // Persist to DB
-    this.db.saveRun(runResult, experimentId);
+    const patch = readGitOutput(repoPath, ['diff', '--no-ext-diff']);
+    const changedFiles = readGitOutput(repoPath, ['diff', '--name-only'])
+      .split('\n')
+      .filter((path) => path.length > 0);
+    const [hiddenTests, regression, checkedConstraints, patchQuality] = await Promise.all([
+      createTestRunner().runHiddenTests(repoPath, task.hiddenTestsPath),
+      createRegressionChecker().check(repoPath),
+      createConstraintChecker().check(repoPath, patch, changedFiles),
+      createPatchQualityAnalyzer().analyze(repoPath, patch),
+    ]);
 
-    // Evaluate
-    const evalInput: ScoringInput = {
-      functionalTests:
+    const functionalTests =
+      runResult.termination === 'completed'
+        ? hiddenTests
+        : { passed: 0, total: Math.max(hiddenTests.total, 1), failures: [runResult.termination] };
+    const constraints = {
+      violations:
         runResult.termination === 'completed'
-          ? {
-              passed: runResult.toolCalls > 0 ? 1 : 0,
-              total: 1,
-              failures: runResult.toolCalls > 0 ? [] : ['no_tool_calls'],
-            }
-          : { passed: 0, total: 1, failures: [runResult.termination] },
-      regression: {
-        typecheckPassed: false,
-        lintPassed: false,
-        existingTests: { passed: 0, total: 0, failures: [] },
-      },
-      constraints: {
-        violations: runResult.termination !== 'completed' ? ['non_completion'] : [],
-      },
-      patchQuality: {
-        lineCount: (runResult.patch ?? '').split('\n').length,
-        newDuplicationDetected: false,
-        newLintViolations: 0,
-      },
+          ? checkedConstraints.violations
+          : [...checkedConstraints.violations, `run_not_completed:${runResult.termination}`],
+    };
+    const evalInput: ScoringInput = {
+      functionalTests,
+      regression,
+      constraints,
+      patchQuality,
     };
     const score = computeScore(evalInput).total;
+
+    // Persist the complete execution trace before returning the score projection.
+    this.db.saveRun({ ...runResult, patch }, experimentId);
 
     return {
       runId: runResult.runId,
       modelId: model.id,
       taskId: task.id,
       trialNumber,
-      success: runResult.termination === 'completed',
+      success:
+        runResult.termination === 'completed' &&
+        functionalTests.total > 0 &&
+        functionalTests.passed === functionalTests.total &&
+        constraints.violations.length === 0,
       score,
       durationMs: runResult.durationMs,
       turns: runResult.turns,
@@ -198,11 +212,7 @@ export class ExperimentCoordinator {
       for (const task of spec.tasks) {
         for (let trial = 0; trial < spec.trials; trial++) {
           const repoPath = `sandboxes/${task.repository}-${trial}-${Date.now()}`;
-          // Create sandbox directory
-          await Bun.$`mkdir -p ${repoPath}`.quiet();
-          // Copy benchmark repo
-          const benchRepo = `benchmarks/repositories/${task.repository}`;
-          await Bun.$`cp -r ${benchRepo}/* ${repoPath}/`.quiet();
+          this.prepareSandbox(task.repository, repoPath);
 
           try {
             const result = await this.runTrial(
@@ -290,7 +300,35 @@ You are working in a TypeScript/Bun project at the current working directory.
 - Keep changes minimal`;
   }
 
+  private prepareSandbox(repository: string, repoPath: string): void {
+    const sourcePath = `benchmarks/repositories/${repository}`;
+    runCommand(['mkdir', '-p', repoPath]);
+    runCommand(['cp', '-R', `${sourcePath}/.`, repoPath]);
+    runCommand(['git', 'init', '-q'], repoPath);
+    runCommand(['git', 'config', 'user.email', 'harnessfit@example.invalid'], repoPath);
+    runCommand(['git', 'config', 'user.name', 'HarnessFit'], repoPath);
+    runCommand(['git', 'add', '.'], repoPath);
+    runCommand(['git', 'commit', '-qm', 'fixture baseline'], repoPath);
+  }
+
   close(): void {
     this.db.close();
+  }
+}
+
+function readGitOutput(repoPath: string, args: readonly string[]): string {
+  const proc = Bun.spawnSync({
+    cmd: ['git', ...args],
+    cwd: repoPath,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  return proc.exitCode === 0 ? proc.stdout.toString() : '';
+}
+
+function runCommand(command: readonly string[], cwd?: string): void {
+  const proc = Bun.spawnSync({ cmd: [...command], cwd, stdout: 'pipe', stderr: 'pipe' });
+  if (proc.exitCode !== 0) {
+    throw new Error(`${command.join(' ')} failed: ${proc.stderr.toString()}`);
   }
 }

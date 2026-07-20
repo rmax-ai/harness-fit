@@ -1,70 +1,78 @@
 import type { TestSuiteResult } from './scorer';
 
-/**
- * Runs hidden acceptance tests against a modified repository.
- *
- * Hidden tests are stored OUTSIDE the writable working tree (SPEC.md §28).
- * The test runner copies them to a temp location, runs `bun test`,
- * and parses results.
- *
- * This is a stub — the real implementation uses Bun.$ to invoke `bun test`.
- */
+/** Runs hidden acceptance tests against a modified repository. */
 export interface TestRunner {
-  /** Run hidden tests for a given task. Returns test results. */
   runHiddenTests(repoPath: string, hiddenTestsPath: string): Promise<TestSuiteResult>;
 }
 
 /**
- * Concrete test runner using Bun's shell API.
+ * Executes a copied hidden-test directory outside the writable repository sandbox.
+ *
+ * The temporary layout mirrors `benchmarks/` so existing hidden tests can import
+ * `../../repositories/<fixture>/...`, but that import resolves to a symlink to the
+ * sandbox under evaluation rather than the source fixture.
  */
 export class BunTestRunner implements TestRunner {
   async runHiddenTests(repoPath: string, hiddenTestsPath: string): Promise<TestSuiteResult> {
-    // Copy hidden tests to a temp location within the repo
-    // (but not in the writable tree — we run from a read-only snapshot)
-    const env: Record<string, string> = {};
-    if (Bun.env.HIDDEN_TESTS_PATH) env.HIDDEN_TESTS_PATH = Bun.env.HIDDEN_TESTS_PATH;
-    env.HIDDEN_TESTS_PATH = hiddenTestsPath;
+    const tempRoot = (await Bun.$`mktemp -d`.text()).trim();
+    const fixtureName = repoPath.split('/').filter(Boolean).at(-1);
+    if (!fixtureName) return failedResult('invalid repository path');
 
-    const proc = Bun.spawnSync(['bun', 'test', '--reporter', 'json'], {
-      cwd: repoPath,
-      env,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-
-    // Bun test --json outputs machine-readable results
     try {
-      const output = JSON.parse(proc.stdout.toString());
-      return parseBunTestOutput(output);
-    } catch {
-      // Fallback: count pass/fail from text output
-      return parseBunTestOutputText(proc.stdout.toString());
+      const copiedTestsPath = `${tempRoot}/hidden-tests/${hiddenTestsPath.split('/').filter(Boolean).at(-1)}`;
+      const repositoryLink = `${tempRoot}/repositories/${fixtureName}`;
+      const setup = Bun.spawnSync({
+        cmd: [
+          'sh',
+          '-c',
+          `mkdir -p "${tempRoot}/hidden-tests" "${tempRoot}/repositories" && cp -R "${hiddenTestsPath}" "${tempRoot}/hidden-tests/" && ln -s "${repoPath}" "${repositoryLink}"`,
+        ],
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      if (setup.exitCode !== 0)
+        return failedResult(setup.stderr.toString() || 'failed to prepare hidden tests');
+
+      const proc = Bun.spawnSync({
+        cmd: [process.execPath, 'test', copiedTestsPath],
+        cwd: tempRoot,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      return parseBunTestOutput(proc.stdout.toString(), proc.stderr.toString(), proc.exitCode);
+    } finally {
+      Bun.spawnSync({ cmd: ['rm', '-rf', tempRoot], stdout: 'ignore', stderr: 'ignore' });
     }
   }
 }
 
-/**
- * Parse bun test --json output.
- */
-function parseBunTestOutput(output: unknown): TestSuiteResult {
-  // Stub — real implementation parses actual bun test JSON format
-  const o = output as Record<string, unknown>;
-  if (o && typeof o.pass === 'number' && typeof o.fail === 'number') {
+function parseBunTestOutput(stdout: string, stderr: string, exitCode: number): TestSuiteResult {
+  const output = `${stdout}\n${stderr}`;
+  const passed = readCount(output, /(\d+) pass/);
+  const failed = readCount(output, /(\d+) fail/);
+  const total = passed + failed;
+  if (total > 0) {
     return {
-      passed: o.pass as number,
-      total: (o.pass as number) + (o.fail as number),
-      failures: [],
+      passed,
+      total,
+      failures: exitCode === 0 ? [] : [summarizeFailure(output)],
     };
   }
-  return { passed: 0, total: 0, failures: [] };
+  return failedResult(summarizeFailure(output));
 }
 
-/**
- * Fallback parser for text output.
- */
-function parseBunTestOutputText(_text: string): TestSuiteResult {
-  // Stub — real implementation regex-matches "N pass" / "M fail"
-  return { passed: 0, total: 0, failures: ['parse-failed'] };
+function readCount(output: string, pattern: RegExp): number {
+  const value = output.match(pattern)?.[1];
+  return value === undefined ? 0 : Number.parseInt(value, 10);
+}
+
+function failedResult(failure: string): TestSuiteResult {
+  return { passed: 0, total: 1, failures: [failure] };
+}
+
+function summarizeFailure(output: string): string {
+  const summary = output.trim().slice(-1000);
+  return summary || 'hidden tests produced no parseable result';
 }
 
 export function createTestRunner(): TestRunner {
