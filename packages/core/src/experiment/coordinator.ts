@@ -177,22 +177,24 @@ export class ExperimentCoordinator {
       constraints,
       patchQuality,
     };
-    const score = computeScore(evalInput).total;
+    const taskScore = computeScore(evalInput);
+    const success =
+      runResult.termination === 'completed' &&
+      functionalTests.total > 0 &&
+      functionalTests.passed === functionalTests.total &&
+      constraints.violations.length === 0;
 
     // Persist the complete execution trace before returning the score projection.
     this.db.saveRun({ ...runResult, patch }, experimentId);
+    this.db.saveEvaluation(runResult.runId, success, taskScore);
 
     return {
       runId: runResult.runId,
       modelId: model.id,
       taskId: task.id,
       trialNumber,
-      success:
-        runResult.termination === 'completed' &&
-        functionalTests.total > 0 &&
-        functionalTests.passed === functionalTests.total &&
-        constraints.violations.length === 0,
-      score,
+      success,
+      score: taskScore.total,
       durationMs: runResult.durationMs,
       turns: runResult.turns,
       toolCalls: runResult.toolCalls,

@@ -6,6 +6,7 @@ export type {
   ConstraintResult,
   PatchQualityMetrics,
 } from './deterministic/scorer';
+export type { TaskScore } from './deterministic/types';
 export { createTestRunner, BunTestRunner } from './deterministic/test-runner';
 export type { TestRunner } from './deterministic/test-runner';
 export { createRegressionChecker, BunRegressionChecker } from './deterministic/regression-check';

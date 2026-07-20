@@ -5,12 +5,13 @@
  * WAL mode, foreign keys enforced, append-only event log.
  */
 import { Database } from 'bun:sqlite';
-import type { RunResult, RunEvent } from '@harnessfit/core';
+import type { RunEvent, RunResult } from '@harnessfit/core';
+import type { TaskScore } from '@harnessfit/evaluator';
 
 export class HarnessDB {
   private db: Database;
 
-  constructor(path: string = ':memory:') {
+  constructor(path = ':memory:') {
     this.db = new Database(path);
     this.db.exec('PRAGMA journal_mode=WAL');
     this.db.exec('PRAGMA foreign_keys=ON');
@@ -86,6 +87,18 @@ export class HarnessDB {
         data_json TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS run_evaluations (
+        run_id TEXT PRIMARY KEY REFERENCES runs(id),
+        success INTEGER NOT NULL,
+        total_score REAL NOT NULL,
+        functional_score REAL NOT NULL,
+        regression_score REAL NOT NULL,
+        constraint_score REAL NOT NULL,
+        quality_score REAL NOT NULL,
+        details_json TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
       CREATE INDEX IF NOT EXISTS idx_runs_experiment ON runs(experiment_id);
       CREATE INDEX IF NOT EXISTS idx_runs_model ON runs(model_id);
       CREATE INDEX IF NOT EXISTS idx_runs_task ON runs(task_id);
@@ -135,10 +148,11 @@ export class HarnessDB {
   }
 
   completeExperiment(id: string): void {
-    this.db.run(
-      'UPDATE experiments SET status = ?, completed_at = ? WHERE id = ?',
-      ['completed', new Date().toISOString(), id],
-    );
+    this.db.run('UPDATE experiments SET status = ?, completed_at = ? WHERE id = ?', [
+      'completed',
+      new Date().toISOString(),
+      id,
+    ]);
   }
 
   // ── Runs ────────────────────────────────────────────
@@ -193,6 +207,43 @@ export class HarnessDB {
       }
     });
     tx();
+  }
+
+  /** Persist the deterministic score projection for an already-recorded run. */
+  saveEvaluation(runId: string, success: boolean, score: TaskScore): void {
+    this.db.run(
+      `INSERT OR REPLACE INTO run_evaluations (
+        run_id, success, total_score, functional_score, regression_score,
+        constraint_score, quality_score, details_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        runId,
+        success ? 1 : 0,
+        score.total,
+        score.functional,
+        score.regression,
+        score.constraint,
+        score.quality,
+        JSON.stringify(score.details),
+      ],
+    );
+  }
+
+  getEvaluation(runId: string): StoredEvaluation | null {
+    const row = this.db.query('SELECT * FROM run_evaluations WHERE run_id = ?').get(runId) as
+      | StoredEvaluationRow
+      | undefined;
+    if (!row) return null;
+    return {
+      runId: row.run_id,
+      success: row.success === 1,
+      total: row.total_score,
+      functional: row.functional_score,
+      regression: row.regression_score,
+      constraint: row.constraint_score,
+      quality: row.quality_score,
+      details: JSON.parse(row.details_json) as TaskScore['details'],
+    };
   }
 
   getRun(runId: string): RunResult | null {
@@ -301,4 +352,26 @@ export interface ExperimentSummary {
   readonly totalCost: number;
   readonly avgDurationMs: number;
   readonly avgTurns: number;
+}
+
+export interface StoredEvaluation {
+  readonly runId: string;
+  readonly success: boolean;
+  readonly total: number;
+  readonly functional: number;
+  readonly regression: number;
+  readonly constraint: number;
+  readonly quality: number;
+  readonly details: TaskScore['details'];
+}
+
+interface StoredEvaluationRow {
+  readonly run_id: string;
+  readonly success: number;
+  readonly total_score: number;
+  readonly functional_score: number;
+  readonly regression_score: number;
+  readonly constraint_score: number;
+  readonly quality_score: number;
+  readonly details_json: string;
 }

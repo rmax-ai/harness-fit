@@ -93,6 +93,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@harnessfit/core": "workspace:*",
+        "@harnessfit/evaluator": "workspace:*",
       },
     },
     "site": {
