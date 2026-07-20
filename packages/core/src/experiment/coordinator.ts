@@ -143,7 +143,7 @@ export class ExperimentCoordinator {
       repoPath,
       taskDescription: taskPrompt,
       configHash: compiled.hash as ConfigHash,
-      seed: trialNumber * 1000 + (Date.now() % 1000),
+      seed: deterministicSeed(model.id, task.id, trialNumber),
       trialNumber,
     };
 
@@ -271,6 +271,8 @@ export class ExperimentCoordinator {
           : 0,
     };
 
+    this.db.completeExperiment(spec.id);
+
     return {
       experimentId: spec.id,
       runs: allResults,
@@ -333,4 +335,13 @@ function runCommand(command: readonly string[], cwd?: string): void {
   if (proc.exitCode !== 0) {
     throw new Error(`${command.join(' ')} failed: ${proc.stderr.toString()}`);
   }
+}
+
+function deterministicSeed(modelId: string, taskId: string, trialNumber: number): number {
+  let hash = 2166136261;
+  for (const character of `${modelId}:${taskId}:${trialNumber}`) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
