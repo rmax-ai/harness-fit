@@ -1,79 +1,117 @@
 /**
- * Minimal YAML config parser for HarnessFit experiment definitions.
- * Handles the flat key-value + simple list-of-objects structure.
+ * Parser for the baseline experiment configuration supported by the CLI.
  */
 
-export interface ExperimentConfig {
-  id: string;
-  models: Array<{
-    id: string;
-    provider: 'openai' | 'anthropic' | 'google';
-    model: string;
-  }>;
-  trials: number;
-  benchmark?: {
-    tasksDir?: string;
-    reposDir?: string;
-  };
+const PROVIDERS = ['openai', 'anthropic', 'google'] as const;
+
+type Provider = (typeof PROVIDERS)[number];
+
+interface ExperimentModel {
+  readonly id: string;
+  readonly provider: Provider;
+  readonly model: string;
 }
 
-/**
- * Parse a simple YAML experiment config file.
- */
+export interface ExperimentConfig {
+  readonly id: string;
+  readonly models: readonly ExperimentModel[];
+  readonly trials: number;
+}
+
+/** Parse the limited YAML shape currently supported by `harnessfit baseline`. */
 export function parseExperimentConfig(raw: string): ExperimentConfig {
-  const lines = raw.split('\n');
-  const config: Record<string, unknown> = {};
-  const models: Array<Record<string, string>> = [];
-  let currentModel: Record<string, string> | null = null;
+  let id: string | undefined;
+  let trials = 1;
+  let inModels = false;
+  let currentModel: Partial<ExperimentModel> | undefined;
+  const models: ExperimentModel[] = [];
 
-  for (const line of lines) {
+  for (const [index, rawLine] of raw.split('\n').entries()) {
+    const lineNumber = index + 1;
+    const line = rawLine.replace(/#.*$/, '');
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
+    if (!trimmed) continue;
 
-    // List item: "- key: value"
-    const listItemMatch = trimmed.match(/^-\s+(\w[\w-]*)\s*:\s*(.+)$/);
-    if (listItemMatch?.[1]) {
-      const key = listItemMatch[1];
-      const value = cleanValue(listItemMatch[2] ?? '');
-      if (key === 'id') {
-        currentModel = { id: value };
-        models.push(currentModel);
-      } else if (currentModel) {
-        currentModel[key] = value;
+    const modelMatch = line.match(/^\s+-\s+id:\s*(.+)$/);
+    if (modelMatch) {
+      if (!inModels) {
+        throw new Error(`Line ${lineNumber}: model entries must be under models:`);
+      }
+      currentModel = { id: cleanValue(modelMatch[1]) };
+      continue;
+    }
+
+    const modelPropertyMatch = line.match(/^\s+(provider|model):\s*(.+)$/);
+    if (modelPropertyMatch) {
+      if (!inModels || !currentModel) {
+        throw new Error(`Line ${lineNumber}: model properties require a preceding model id`);
+      }
+      const [, key, value] = modelPropertyMatch;
+      currentModel[key] = cleanValue(value);
+      if (currentModel.id && currentModel.provider && currentModel.model) {
+        models.push(validateModel(currentModel, lineNumber));
+        currentModel = undefined;
       }
       continue;
     }
 
-    // Indented continuation of a list item (no leading dash)
-    // e.g. "    provider: google"
-    const indentMatch = trimmed.match(/^(\w[\w-]*)\s*:\s*(.+)$/);
-    if (indentMatch?.[1] && currentModel && line.startsWith(' ') && !line.startsWith('-')) {
-      const key = indentMatch[1];
-      const value = cleanValue(indentMatch[2] ?? '');
-      currentModel[key] = value;
+    const modelsSectionMatch = line.match(/^models:\s*$/);
+    if (modelsSectionMatch) {
+      inModels = true;
       continue;
     }
 
-    // Top-level scalar: "key: value"
-    const scalarMatch = trimmed.match(/^(\w[\w-]*)\s*:\s*(.+)$/);
-    if (scalarMatch?.[1]) {
-      const key = scalarMatch[1];
-      const value = cleanValue(scalarMatch[2] ?? '');
-      // Try numeric
-      const num = Number(value);
-      config[key] = isNaN(num) ? value : num;
+    const scalarMatch = line.match(/^(id|trials):\s*(.+)$/);
+    if (scalarMatch) {
+      const [, key, value] = scalarMatch;
+      if (key === 'id') {
+        id = cleanValue(value);
+      } else {
+        trials = parseTrials(cleanValue(value), lineNumber);
+      }
+      continue;
     }
+
+    throw new Error(
+      `Line ${lineNumber}: unsupported configuration. Baseline supports only id, models, and trials.`,
+    );
   }
 
-  const trials = (config.trials as Record<string, number>)?.search ?? 1;
+  if (!id) {
+    throw new Error('Missing required experiment id');
+  }
+  if (currentModel) {
+    throw new Error(`Model ${currentModel.id ?? '<unknown>'} must specify provider and model`);
+  }
+  if (models.length === 0) {
+    throw new Error('At least one model is required');
+  }
 
+  return { id, models, trials };
+}
+
+function parseTrials(value: string, lineNumber: number): number {
+  const trials = Number(value);
+  if (!Number.isInteger(trials) || trials < 1) {
+    throw new Error(`Line ${lineNumber}: trials must be a positive integer`);
+  }
+  return trials;
+}
+
+function validateModel(model: Partial<ExperimentModel>, lineNumber: number): ExperimentModel {
+  if (!model.id || !model.provider || !model.model) {
+    throw new Error(`Line ${lineNumber}: each model requires id, provider, and model`);
+  }
+  if (!PROVIDERS.includes(model.provider as Provider)) {
+    throw new Error(`Line ${lineNumber}: unsupported provider ${model.provider}`);
+  }
   return {
-    id: config.id as string,
-    models: models as ExperimentConfig['models'],
-    trials: typeof trials === 'number' ? trials : 1,
+    id: model.id,
+    provider: model.provider as Provider,
+    model: model.model,
   };
 }
 
 function cleanValue(raw: string): string {
-  return raw.replace(/#.*$/, '').trim().replace(/^["']|["']$/g, '');
+  return raw.trim().replace(/^['"]|['"]$/g, '');
 }

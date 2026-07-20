@@ -5,8 +5,8 @@
  */
 import { ExperimentCoordinator } from '@harnessfit/core';
 import type { ModelSpec } from '@harnessfit/core';
-import { HarnessDB } from '@harnessfit/storage';
 import { GENERIC_HARNESS } from '@harnessfit/harness';
+import { HarnessDB } from '@harnessfit/storage';
 import { createProvider } from './factory';
 import { parseExperimentConfig } from './parser';
 
@@ -59,7 +59,6 @@ async function main(): Promise<void> {
     case 'inspect':
       await cmdInspect(args[1]);
       break;
-    case 'help':
     default:
       console.log(USAGE);
       break;
@@ -86,38 +85,7 @@ models:
     provider: anthropic
     model: claude-haiku-4-5
 
-benchmark:
-  tasksDir: benchmarks/tasks
-  reposDir: benchmarks/repositories
-
-trials:
-  search: 3
-  finalists: 5
-  headline: 10
-
-optimizer:
-  algorithm: coordinate-hill-climbing
-  randomRestarts: 3
-  maximumCandidatesPerModel: 120
-  minimumSuccessImprovement: 0.03
-
-limits:
-  maxTurns: 24
-  maxToolCalls: 40
-  maxWallTimeSeconds: 600
-  maxCostUsdPerRun: 5
-
-objective:
-  successWeight: 1.0
-  costWeight: 0.10
-  latencyWeight: 0.05
-  varianceWeight: 0.10
-
-reporting:
-  transferMatrix: true
-  ablations: true
-  paretoFrontiers: true
-  confidenceIntervals: true
+trials: 1
 `;
 
   const configPath = `${definitionsDir}/default.yaml`;
@@ -199,7 +167,7 @@ async function cmdBaseline(args: string[]): Promise<void> {
   }
 
   // 3. Load tasks
-  const tasksDir = expConfig.benchmark?.tasksDir ?? 'benchmarks/tasks';
+  const tasksDir = 'benchmarks/tasks';
   console.log(`\nLoading tasks from ${tasksDir}/...`);
   const coordinator = new ExperimentCoordinator();
   const tasks = await coordinator.loadTasks(tasksDir);
@@ -223,8 +191,10 @@ async function cmdBaseline(args: string[]): Promise<void> {
   };
 
   // 5. Run
-  console.log(`\nRunning baseline experiment...`);
-  console.log(`  ${models.length} models × ${tasks.length} tasks × ${expConfig.trials} trials = ${models.length * tasks.length * expConfig.trials} runs\n`);
+  console.log('\nRunning baseline experiment...');
+  console.log(
+    `  ${models.length} models × ${tasks.length} tasks × ${expConfig.trials} trials = ${models.length * tasks.length * expConfig.trials} runs\n`,
+  );
 
   const startTime = Date.now();
   const result = await coordinator.run(spec);
@@ -250,8 +220,7 @@ async function cmdBaseline(args: string[]): Promise<void> {
   console.log('----------------|------|---------|--------|-------');
   for (const [modelId, runs] of result.byModel) {
     const success = runs.filter((r) => r.success).length;
-    const avgScore =
-      runs.length > 0 ? runs.reduce((s, r) => s + r.score, 0) / runs.length : 0;
+    const avgScore = runs.length > 0 ? runs.reduce((s, r) => s + r.score, 0) / runs.length : 0;
     const cost = runs.reduce((s, r) => s + r.costUsd, 0);
     console.log(
       `${modelId.padEnd(15)} | ${String(runs.length).padStart(4)} | ${String(success).padStart(7)} | ${avgScore.toFixed(2).padStart(6)} | $${cost.toFixed(4)}`,
