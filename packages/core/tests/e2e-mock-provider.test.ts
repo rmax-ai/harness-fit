@@ -86,6 +86,7 @@ describe('E2E Integration: Mock Provider → Agent Loop → Score', () => {
     const config: AgentLoopConfig = {
       model: provider,
       modelId: 'mock-model' as TaskId as never,
+      modelName: 'mock-model',
       tools,
       systemPrompt: 'You are a coding agent. Fix bugs.',
       limits: {
@@ -143,6 +144,7 @@ describe('E2E Integration: Mock Provider → Agent Loop → Score', () => {
     const config: AgentLoopConfig = {
       model: provider,
       modelId: 'mock-model' as TaskId as never,
+      modelName: 'mock-model',
       tools,
       systemPrompt: 'You are a coding agent.',
       limits: {

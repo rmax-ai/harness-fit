@@ -41,12 +41,7 @@ export interface ExperimentSpec {
   readonly tasks: readonly TaskDefinition[];
   readonly trials: number;
   readonly harness: HarnessConfig;
-  readonly limits?: Partial<{
-    maxTurns: number;
-    maxToolCalls: number;
-    maxWallTimeSeconds: number;
-    maxCostUsdPerRun: number;
-  }>;
+  readonly limits?: Partial<RunLimits>;
   readonly dbPath?: string;
 }
 
@@ -114,12 +109,14 @@ export class ExperimentCoordinator {
     trialNumber: number,
     repoPath: string,
     experimentId: string,
+    experimentLimits?: Partial<RunLimits>,
   ): Promise<TrialResult> {
     const runLimits: Partial<RunLimits> = {
       maxTurns: DEFAULT_LIMITS.maxTurns,
       maxToolCalls: DEFAULT_LIMITS.maxToolCalls,
       maxWallTimeSeconds: DEFAULT_LIMITS.maxWallTimeSeconds,
       maxCostUsd: DEFAULT_LIMITS.maxCostUsd,
+      ...experimentLimits,
     };
 
     // Compile harness
@@ -210,7 +207,7 @@ export class ExperimentCoordinator {
           await Bun.$`bun install --cwd ${repoPath}`.quiet();
 
           try {
-            const result = await this.runTrial(model, task, spec.harness, trial, repoPath, spec.id);
+            const result = await this.runTrial(model, task, spec.harness, trial, repoPath, spec.id, spec.limits);
             allResults.push(result);
             console.log(
               `  [${model.id}/${task.id}/t${trial}] ${result.termination} (${result.score.toFixed(2)})`,

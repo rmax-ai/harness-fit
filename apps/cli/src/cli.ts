@@ -212,6 +212,7 @@ async function cmdBaseline(args: string[]): Promise<void> {
     tasks,
     trials: expConfig.trials,
     harness: GENERIC_HARNESS,
+    limits: expConfig.limits,
   };
 
   // 5. Run
