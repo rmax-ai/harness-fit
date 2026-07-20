@@ -6,15 +6,14 @@
  */
 
 import type { ModelProvider } from '@harnessfit/core';
-import type { HarnessConfig } from '@harnessfit/harness';
 import { AgentLoop, createDefaultRegistry } from '@harnessfit/core';
 import type { AgentLoopConfig, TaskContext } from '@harnessfit/core';
-import { compileHarness } from '@harnessfit/harness';
-import { HarnessDB } from '@harnessfit/storage';
+import type { ConfigHash, ModelId, RunLimits, TaskId } from '@harnessfit/core';
 import { computeScore } from '@harnessfit/evaluator';
 import type { ScoringInput } from '@harnessfit/evaluator';
-import { DEFAULT_LIMITS } from '@harnessfit/core';
-import type { RunLimits, ModelId, TaskId, ConfigHash } from '@harnessfit/core';
+import type { HarnessConfig } from '@harnessfit/harness';
+import { compileHarness } from '@harnessfit/harness';
+import { HarnessDB } from '@harnessfit/storage';
 
 // ── Types ────────────────────────────────────────────
 
@@ -41,12 +40,7 @@ export interface ExperimentSpec {
   readonly tasks: readonly TaskDefinition[];
   readonly trials: number;
   readonly harness: HarnessConfig;
-  readonly limits?: Partial<{
-    maxTurns: number;
-    maxToolCalls: number;
-    maxWallTimeSeconds: number;
-    maxCostUsdPerRun: number;
-  }>;
+  readonly limits?: Partial<RunLimits>;
   readonly dbPath?: string;
 }
 
@@ -114,14 +108,8 @@ export class ExperimentCoordinator {
     trialNumber: number,
     repoPath: string,
     experimentId: string,
+    limits?: Partial<RunLimits>,
   ): Promise<TrialResult> {
-    const runLimits: Partial<RunLimits> = {
-      maxTurns: DEFAULT_LIMITS.maxTurns,
-      maxToolCalls: DEFAULT_LIMITS.maxToolCalls,
-      maxWallTimeSeconds: DEFAULT_LIMITS.maxWallTimeSeconds,
-      maxCostUsd: DEFAULT_LIMITS.maxCostUsd,
-    };
-
     // Compile harness
     const compiled = compileHarness(harness, [], '');
 
@@ -134,7 +122,7 @@ export class ExperimentCoordinator {
       modelId: model.id as ModelId,
       tools,
       systemPrompt: compiled.systemPrompt,
-      limits: runLimits,
+      limits,
     };
 
     const agentLoop = new AgentLoop(agentConfig);
@@ -217,7 +205,15 @@ export class ExperimentCoordinator {
           await Bun.$`cp -r ${benchRepo}/* ${repoPath}/`.quiet();
 
           try {
-            const result = await this.runTrial(model, task, spec.harness, trial, repoPath, spec.id);
+            const result = await this.runTrial(
+              model,
+              task,
+              spec.harness,
+              trial,
+              repoPath,
+              spec.id,
+              spec.limits,
+            );
             allResults.push(result);
             console.log(
               `  [${model.id}/${task.id}/t${trial}] ${result.termination} (${result.score.toFixed(2)})`,

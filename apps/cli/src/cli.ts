@@ -85,7 +85,40 @@ models:
     provider: anthropic
     model: claude-haiku-4-5
 
-trials: 1
+benchmark:
+  trainingSplit: train
+  developmentSplit: dev
+  testSplit: test
+
+trials:
+  search: 3
+  finalists: 5
+  headline: 10
+
+optimizer:
+  algorithm: coordinate-hill-climbing
+  randomRestarts: 3
+  maximumCandidatesPerModel: 120
+  minimumSuccessImprovement: 0.03
+
+limits:
+  maxTurns: 24
+  maxToolCalls: 40
+  maxWallTimeSeconds: 600
+  maxOutputTokens: 32000
+  maxCostUsdPerRun: 5
+
+objective:
+  successWeight: 1.0
+  costWeight: 0.10
+  latencyWeight: 0.05
+  varianceWeight: 0.10
+
+reporting:
+  transferMatrix: true
+  ablations: true
+  paretoFrontiers: true
+  confidenceIntervals: true
 `;
 
   const configPath = `${definitionsDir}/default.yaml`;
@@ -150,10 +183,19 @@ async function cmdBaseline(args: string[]): Promise<void> {
   const expConfig = parseExperimentConfig(raw);
   console.log(`  Experiment: ${expConfig.id}`);
   console.log(`  Models: ${expConfig.models.map((m) => m.id).join(', ')}`);
-  console.log(`  Trials per model×task: ${expConfig.trials}`);
+  console.log(`  Trials per model×task: ${expConfig.trials.search}`);
 
   // 2. Create provider adapters
   console.log('\nInitializing providers...');
+  const missingCredentials = expConfig.models
+    .map((model) => providerCredential(model.provider))
+    .filter((credential): credential is string => !Bun.env[credential]);
+  if (missingCredentials.length > 0) {
+    console.error(`Missing provider credentials: ${[...new Set(missingCredentials)].join(', ')}`);
+    console.error('Set credentials and run: bun harnessfit providers check');
+    process.exit(1);
+  }
+
   const models: ModelSpec[] = [];
   for (const m of expConfig.models) {
     const adapter = createProvider(m);
@@ -186,14 +228,21 @@ async function cmdBaseline(args: string[]): Promise<void> {
     id: expConfig.id,
     models,
     tasks,
-    trials: expConfig.trials,
+    trials: expConfig.trials.search,
     harness: GENERIC_HARNESS,
+    limits: {
+      maxTurns: expConfig.limits.maxTurns,
+      maxToolCalls: expConfig.limits.maxToolCalls,
+      maxWallTimeSeconds: expConfig.limits.maxWallTimeSeconds,
+      maxOutputTokens: expConfig.limits.maxOutputTokens,
+      maxCostUsd: expConfig.limits.maxCostUsdPerRun,
+    },
   };
 
   // 5. Run
   console.log('\nRunning baseline experiment...');
   console.log(
-    `  ${models.length} models × ${tasks.length} tasks × ${expConfig.trials} trials = ${models.length * tasks.length * expConfig.trials} runs\n`,
+    `  ${models.length} models × ${tasks.length} tasks × ${expConfig.trials.search} trials = ${models.length * tasks.length * expConfig.trials.search} runs\n`,
   );
 
   const startTime = Date.now();
@@ -241,6 +290,17 @@ function replacer(_key: string, value: unknown): unknown {
     return Object.fromEntries(value);
   }
   return value;
+}
+
+function providerCredential(provider: ModelSpec['provider']): string {
+  switch (provider) {
+    case 'openai':
+      return 'OPENAI_API_KEY';
+    case 'anthropic':
+      return 'ANTHROPIC_API_KEY';
+    case 'google':
+      return 'GOOGLE_API_KEY';
+  }
 }
 
 async function cmdOptimize(args: string[]): Promise<void> {

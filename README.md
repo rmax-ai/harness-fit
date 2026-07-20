@@ -60,7 +60,7 @@ bun harnessfit providers check
 bun harnessfit baseline --experiment experiments/definitions/default.yaml
 ```
 
-The current baseline configuration supports only `id`, `models`, and a positive integer `trials`. It always uses the bundled benchmark tasks and repositories. Optimization, held-out evaluation, transfer matrices, and reporting are not yet implemented.
+Experiment definitions configure the model cohort, benchmark splits, trial tiers, optimizer budget, runtime limits, objective weights, and requested reports. The baseline command currently executes the configured search-tier trials; optimization, held-out evaluation, transfer matrices, and reporting are implemented in later phases.
 
 > **API keys:** Set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY` in your environment. See `.env.example`.
 >
