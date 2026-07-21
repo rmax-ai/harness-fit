@@ -60,7 +60,7 @@ bun harnessfit providers check
 bun harnessfit baseline --experiment experiments/definitions/default.yaml
 ```
 
-Experiment definitions configure the model cohort, benchmark splits, trial tiers, optimizer budget, runtime limits, objective weights, and requested reports. The baseline command currently executes the configured search-tier trials; optimization, held-out evaluation, transfer matrices, and reporting are implemented in later phases.
+Experiment definitions configure the model cohort, benchmark splits, trial tiers, optimizer budget, runtime limits, objective weights, and requested reports. `baseline` executes the configured search-tier trials with the generic harness. `evaluate` runs a supplied harness JSON against the configured test split using the headline trial tier. `report` reads the persisted SQLite evaluations and emits an aggregate report.
 
 > **API keys:** Set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY` in your environment. See `.env.example`.
 >
@@ -133,13 +133,13 @@ See [SPEC.md §2](SPEC.md#2-research-questions) for the full list.
 bun harnessfit init                              # Initialize project
 bun harnessfit providers check                   # Validate API credentials
 bun harnessfit baseline --experiment …           # Run baseline experiment
+bun harnessfit evaluate --config harness.json    # Evaluate a harness on held-out tasks
+bun harnessfit report --experiment …             # Generate a persisted-run report
 bun harnessfit inspect <run-id>                  # Inspect a single run
 
 # Coming in v0.2.0
 bun harnessfit optimize --model …                # Hill-climb optimization
-bun harnessfit evaluate --config …               # Held-out evaluation
 bun harnessfit transfer --configs …              # Cross-model transfer matrix
-bun harnessfit report --experiment …             # Generate report
 ```
 
 ---

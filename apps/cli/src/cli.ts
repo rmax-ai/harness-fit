@@ -5,7 +5,8 @@
  */
 import { ExperimentCoordinator } from '@harnessfit/core';
 import type { ModelSpec } from '@harnessfit/core';
-import { GENERIC_HARNESS } from '@harnessfit/harness';
+import { GENERIC_HARNESS, parseConfig } from '@harnessfit/harness';
+import type { HarnessConfig } from '@harnessfit/harness';
 import { HarnessDB } from '@harnessfit/storage';
 import { createProvider } from './factory';
 import { parseExperimentConfig } from './parser';
@@ -166,6 +167,25 @@ async function cmdProvidersCheck(): Promise<void> {
 }
 
 async function cmdBaseline(args: string[]): Promise<void> {
+  await cmdRunExperiment(args, {
+    commandName: 'baseline',
+    defaultSplit: 'trainingSplit',
+    trials: 'search',
+    harness: GENERIC_HARNESS,
+  });
+}
+
+interface ExperimentRunOptions {
+  readonly commandName: 'baseline' | 'evaluate';
+  readonly defaultSplit: 'trainingSplit' | 'developmentSplit' | 'testSplit';
+  readonly trials: 'search' | 'finalists' | 'headline';
+  readonly harness: HarnessConfig;
+}
+
+async function cmdRunExperiment(
+  args: readonly string[],
+  options: ExperimentRunOptions,
+): Promise<void> {
   const experimentPath =
     args.find((a) => a.startsWith('--experiment='))?.split('=')[1] ??
     'experiments/definitions/default.yaml';
@@ -184,7 +204,8 @@ async function cmdBaseline(args: string[]): Promise<void> {
   const expConfig = parseExperimentConfig(raw);
   console.log(`  Experiment: ${expConfig.id}`);
   console.log(`  Models: ${expConfig.models.map((m) => m.id).join(', ')}`);
-  console.log(`  Trials per model×task: ${expConfig.trials.search}`);
+  const trials = expConfig.trials[options.trials];
+  console.log(`  Trials per model×task: ${trials}`);
 
   // 2. Create provider adapters
   console.log('\nInitializing providers...');
@@ -211,7 +232,7 @@ async function cmdBaseline(args: string[]): Promise<void> {
 
   // 3. Load tasks
   const tasksDir = 'benchmarks/tasks';
-  const split = requestedSplit ?? expConfig.benchmark.trainingSplit;
+  const split = requestedSplit ?? expConfig.benchmark[options.defaultSplit];
   console.log(`\nLoading ${split} tasks from ${tasksDir}/...`);
   const coordinator = new ExperimentCoordinator();
   const tasks = await coordinator.loadTasks(tasksDir, split);
@@ -230,8 +251,8 @@ async function cmdBaseline(args: string[]): Promise<void> {
     id: expConfig.id,
     models,
     tasks,
-    trials: expConfig.trials.search,
-    harness: GENERIC_HARNESS,
+    trials,
+    harness: options.harness,
     limits: {
       maxTurns: expConfig.limits.maxTurns,
       maxToolCalls: expConfig.limits.maxToolCalls,
@@ -242,9 +263,9 @@ async function cmdBaseline(args: string[]): Promise<void> {
   };
 
   // 5. Run
-  console.log('\nRunning baseline experiment...');
+  console.log(`\nRunning ${options.commandName} experiment...`);
   console.log(
-    `  ${models.length} models × ${tasks.length} tasks × ${expConfig.trials.search} trials = ${models.length * tasks.length * expConfig.trials.search} runs\n`,
+    `  ${models.length} models × ${tasks.length} tasks × ${trials} trials = ${models.length * tasks.length * trials} runs\n`,
   );
 
   const startTime = Date.now();
@@ -279,7 +300,7 @@ async function cmdBaseline(args: string[]): Promise<void> {
   }
 
   // Save results
-  const outputPath = `experiments/results/${expConfig.id}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  const outputPath = `experiments/results/${expConfig.id}-${options.commandName}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
   await Bun.write(outputPath, JSON.stringify(result, replacer, 2));
   console.log(`\nResults saved: ${outputPath}`);
 
@@ -318,9 +339,31 @@ async function cmdOptimize(args: string[]): Promise<void> {
 }
 
 async function cmdEvaluate(args: string[]): Promise<void> {
-  const config = args.find((a) => a.startsWith('--config='))?.split('=')[1];
-  console.log(`Evaluating config: ${config || 'default'}`);
-  console.log('(Held-out evaluation coming in v0.2.0)');
+  const configPath = args.find((arg) => arg.startsWith('--config='))?.split('=')[1];
+  if (!configPath) {
+    console.log(
+      'Usage: harnessfit evaluate --config=<harness.json> [--experiment=<definition.yaml>] [--split=test]',
+    );
+    return;
+  }
+
+  const file = Bun.file(configPath);
+  if (!(await file.exists())) {
+    console.error(`Harness config not found: ${configPath}`);
+    process.exit(1);
+  }
+  const harness = parseConfig(await file.text());
+  if (!harness) {
+    console.error(`Harness config is not a valid HarnessConfig JSON document: ${configPath}`);
+    process.exit(1);
+  }
+
+  await cmdRunExperiment(args, {
+    commandName: 'evaluate',
+    defaultSplit: 'testSplit',
+    trials: 'headline',
+    harness,
+  });
 }
 
 async function cmdTransfer(_args: string[]): Promise<void> {
