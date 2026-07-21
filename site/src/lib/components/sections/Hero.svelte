@@ -9,8 +9,9 @@
     Agent Harness Profiles
   </h1>
   <p class="text-lg text-slate-400 max-w-2xl mx-auto mb-8">
-    An experimental framework testing the hypothesis that harness compatibility
-    matters more than raw model capability.
+    An early experimental framework for measuring how a shared agent harness affects
+    model behavior. It provides execution and measurement infrastructure; the central
+    harness-fit hypothesis remains to be tested.
   </p>
   <div class="flex flex-col sm:flex-row gap-3 justify-center">
     <a

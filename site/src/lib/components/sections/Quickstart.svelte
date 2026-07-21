@@ -19,7 +19,14 @@ bun install
 bun test packages/ apps/ benchmarks/repositories/
 
 # Type check
-bun run typecheck</pre>
+bun run typecheck
+
+# Initialize and validate provider credentials
+bun harnessfit init
+bun harnessfit providers check
+
+# Run the generic-harness baseline (requires provider keys)
+bun harnessfit baseline --experiment experiments/definitions/default.yaml</pre>
   </div>
 
   <div class="bg-slate-900/50 border border-slate-800 rounded-lg p-5">
@@ -28,7 +35,9 @@ bun run typecheck</pre>
       Set <code class="text-indigo-400">OPENAI_API_KEY</code>,
       <code class="text-indigo-400">ANTHROPIC_API_KEY</code>,
       and <code class="text-indigo-400">GOOGLE_API_KEY</code> in your environment.
-      Copy <code class="text-indigo-400">.env.example</code> to get started.
+      Copy <code class="text-indigo-400">.env.example</code> to get started. Provider model IDs can be
+      overridden with <code class="text-indigo-400">HARNESSFIT_*_MODEL</code> variables when an account
+      does not expose the defaults.
     </p>
   </div>
 </Section>

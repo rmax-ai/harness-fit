@@ -10,35 +10,35 @@ export const STACK = [
 
 export const FEATURES = [
   {
-    title: "Deterministic Benchmark",
-    desc: "Hidden acceptance tests ensure fair, reproducible evaluation across models.",
+    title: "Hidden-Test Evaluation",
+    desc: "Six split benchmark tasks are evaluated with hidden acceptance tests, regression checks, and deterministic scoring.",
   },
   {
-    title: "Provider-Neutral Runtime",
-    desc: "Unified adapter interface for OpenAI, Anthropic, and Google Gemini — swap without changing agent code.",
+    title: "Multi-Provider Runtime",
+    desc: "One normalized runtime executes OpenAI, Anthropic, and Gemini models under the same generic harness.",
   },
   {
     title: "Parameterized Harness",
-    desc: "37 tunable harness parameters — prompt style, tool descriptions, validation policy, retry strategy.",
+    desc: "A machine-readable harness has 37 typed settings spanning prompts, tools, context, validation, retries, and completion.",
   },
   {
-    title: "Hill-Climbing Optimizer",
-    desc: "Per-model coordinate ascent finds optimal harness profiles with statistical acceptance.",
+    title: "Held-Out Evaluation",
+    desc: "Evaluate a supplied harness JSON on the configured test split with persisted success, score, cost, and latency data.",
   },
   {
-    title: "Content-Addressable",
-    desc: "Every config, task, and result hashed for deterministic reproducibility.",
+    title: "Persisted Run Evidence",
+    desc: "SQLite stores run metadata, events, patches, deterministic score components, costs, and durations; harness configs are hashed.",
   },
   {
-    title: "Event Log Architecture",
-    desc: "Typed event log as system of record — every runtime action captured for analysis.",
+    title: "Research Roadmap",
+    desc: "Optimization, transfer matrices, stability analysis, and statistical acceptance remain planned work—not current results.",
   },
 ];
 
 export const METRICS = [
-  { label: "89 tests", desc: "Unit + integration tests across 7 modules" },
+  { label: "101 passing tests", desc: "7 live-provider checks are opt-in" },
   { label: "0 type errors", desc: "Full strict TypeScript with branded types" },
-  { label: "37 parameters", desc: "Tunable harness dimensions for optimization" },
+  { label: "6 benchmark tasks", desc: "3 train · 2 dev · 1 test" },
   { label: "3 providers", desc: "OpenAI · Anthropic · Google Gemini adapters" },
 ];
 
