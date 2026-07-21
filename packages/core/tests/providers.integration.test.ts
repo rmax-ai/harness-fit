@@ -6,9 +6,12 @@
  *
  * Run: HARNESSFIT_LIVE_TEST=1 bun test packages/core/tests/providers.integration.test.ts
  */
-import { describe, it, expect } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
 const LIVE = Bun.env.HARNESSFIT_LIVE_TEST === '1';
+const OPENAI_MODEL = Bun.env.HARNESSFIT_OPENAI_MODEL || 'gpt-5.6-luna';
+const ANTHROPIC_MODEL = Bun.env.HARNESSFIT_ANTHROPIC_MODEL || 'claude-haiku-4-5';
+const GOOGLE_MODEL = Bun.env.HARNESSFIT_GOOGLE_MODEL || 'gemini-3.5-flash';
 
 // Dynamic imports so we don't fail on module resolution when keys aren't set
 async function getProviders() {
@@ -32,7 +35,7 @@ describe('Provider Integration (live API)', () => {
     const provider = new OpenAIProvider();
 
     const response = await provider.generate({
-      model: 'gpt-4.1-mini',
+      model: OPENAI_MODEL,
       system: 'Reply with exactly "OK".',
       messages: [{ role: 'user', content: 'Say OK' }],
       tools: [],
@@ -42,7 +45,7 @@ describe('Provider Integration (live API)', () => {
 
     expect(response.stopReason).toBe('end_turn');
     expect(response.content.length).toBeGreaterThan(0);
-    expect(response.content[0]!.type).toBe('text');
+    expect(response.content[0]?.type).toBe('text');
     expect(response.usage.inputTokens).toBeGreaterThan(0);
     expect(response.usage.outputTokens).toBeGreaterThan(0);
   });
@@ -79,7 +82,7 @@ describe('Provider Integration (live API)', () => {
     const provider = new AnthropicProvider();
 
     const response = await provider.generate({
-      model: 'claude-haiku-4-5-20241022',
+      model: ANTHROPIC_MODEL,
       system: 'Reply with exactly "OK".',
       messages: [{ role: 'user', content: 'Say OK' }],
       tools: [],
@@ -115,7 +118,7 @@ describe('Provider Integration (live API)', () => {
     const provider = new GoogleProvider();
 
     const response = await provider.generate({
-      model: 'gemini-2.5-flash',
+      model: GOOGLE_MODEL,
       system: 'Reply with exactly "OK".',
       messages: [{ role: 'user', content: 'Say OK' }],
       tools: [],

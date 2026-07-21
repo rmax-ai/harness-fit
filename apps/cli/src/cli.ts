@@ -78,7 +78,7 @@ async function cmdInit(args: readonly string[]): Promise<void> {
 models:
   - id: gemini-flash
     provider: google
-    model: gemini-2.5-flash
+    model: gemini-3.5-flash
   - id: gpt-luna
     provider: openai
     model: gpt-5.6-luna
@@ -220,14 +220,15 @@ async function cmdRunExperiment(
 
   const models: ModelSpec[] = [];
   for (const m of expConfig.models) {
-    const adapter = createProvider(m);
+    const providerModel = resolveProviderModel(m);
+    const adapter = createProvider({ ...m, model: providerModel });
     models.push({
       id: m.id,
       provider: m.provider,
-      model: m.model,
+      model: providerModel,
       adapter,
     });
-    console.log(`  ${m.id}: ${m.provider}/${m.model} ✓`);
+    console.log(`  ${m.id}: ${m.provider}/${providerModel} ✓`);
   }
 
   // 3. Load tasks
@@ -324,6 +325,19 @@ function providerCredential(provider: ModelSpec['provider']): string {
     case 'google':
       return 'GOOGLE_API_KEY';
   }
+}
+
+function resolveProviderModel(model: {
+  readonly provider: ModelSpec['provider'];
+  readonly model: string;
+}): string {
+  const override =
+    model.provider === 'openai'
+      ? Bun.env.HARNESSFIT_OPENAI_MODEL
+      : model.provider === 'anthropic'
+        ? Bun.env.HARNESSFIT_ANTHROPIC_MODEL
+        : Bun.env.HARNESSFIT_GOOGLE_MODEL;
+  return override || model.model;
 }
 
 async function cmdOptimize(args: string[]): Promise<void> {
