@@ -5,8 +5,9 @@
  */
 import { ExperimentCoordinator } from '@harnessfit/core';
 import type { ModelSpec } from '@harnessfit/core';
+import { GENERIC_HARNESS, parseConfig } from '@harnessfit/harness';
+import type { HarnessConfig } from '@harnessfit/harness';
 import { HarnessDB } from '@harnessfit/storage';
-import { GENERIC_HARNESS } from '@harnessfit/harness';
 import { createProvider } from './factory';
 import { parseExperimentConfig } from './parser';
 
@@ -14,7 +15,7 @@ const USAGE = `
 HarnessFit — Automatic Discovery of Model-Specific Agent Harness Profiles
 
 Commands:
-  init                  Initialize a new experiment workspace
+  init [--force]        Initialize an experiment workspace
   providers check       Validate provider API credentials
   baseline              Run baseline experiment
   optimize              Run hill-climbing optimization
@@ -31,7 +32,7 @@ async function main(): Promise<void> {
 
   switch (command) {
     case 'init': {
-      await cmdInit();
+      await cmdInit(args.slice(1));
       break;
     }
     case 'providers':
@@ -59,14 +60,13 @@ async function main(): Promise<void> {
     case 'inspect':
       await cmdInspect(args[1]);
       break;
-    case 'help':
     default:
       console.log(USAGE);
       break;
   }
 }
 
-async function cmdInit(): Promise<void> {
+async function cmdInit(args: readonly string[]): Promise<void> {
   const experimentsDir = 'experiments';
   const definitionsDir = `${experimentsDir}/definitions`;
   const resultsDir = `${experimentsDir}/results`;
@@ -78,7 +78,7 @@ async function cmdInit(): Promise<void> {
 models:
   - id: gemini-flash
     provider: google
-    model: gemini-2.5-flash
+    model: gemini-3.5-flash
   - id: gpt-luna
     provider: openai
     model: gpt-5.6-luna
@@ -87,8 +87,9 @@ models:
     model: claude-haiku-4-5
 
 benchmark:
-  tasksDir: benchmarks/tasks
-  reposDir: benchmarks/repositories
+  trainingSplit: train
+  developmentSplit: dev
+  testSplit: test
 
 trials:
   search: 3
@@ -105,6 +106,7 @@ limits:
   maxTurns: 24
   maxToolCalls: 40
   maxWallTimeSeconds: 600
+  maxOutputTokens: 32000
   maxCostUsdPerRun: 5
 
 objective:
@@ -121,7 +123,13 @@ reporting:
 `;
 
   const configPath = `${definitionsDir}/default.yaml`;
-  await Bun.write(configPath, defaultConfig);
+  const configFile = Bun.file(configPath);
+  const force = args.includes('--force');
+  const configExists = await configFile.exists();
+
+  if (!configExists || force) {
+    await Bun.write(configPath, defaultConfig);
+  }
 
   const gitkeep = Bun.file(`${resultsDir}/.gitkeep`);
   if (!(await gitkeep.exists())) {
@@ -129,7 +137,11 @@ reporting:
   }
 
   console.log('✓ Initialized HarnessFit experiment directory');
-  console.log(`  Config: ${configPath}`);
+  if (configExists && !force) {
+    console.log(`  Config: ${configPath} (preserved; use --force to overwrite)`);
+  } else {
+    console.log(`  Config: ${configPath}`);
+  }
   console.log(`  Results: ${resultsDir}/`);
   console.log('');
   console.log('Next steps:');
@@ -155,9 +167,29 @@ async function cmdProvidersCheck(): Promise<void> {
 }
 
 async function cmdBaseline(args: string[]): Promise<void> {
+  await cmdRunExperiment(args, {
+    commandName: 'baseline',
+    defaultSplit: 'trainingSplit',
+    trials: 'search',
+    harness: GENERIC_HARNESS,
+  });
+}
+
+interface ExperimentRunOptions {
+  readonly commandName: 'baseline' | 'evaluate';
+  readonly defaultSplit: 'trainingSplit' | 'developmentSplit' | 'testSplit';
+  readonly trials: 'search' | 'finalists' | 'headline';
+  readonly harness: HarnessConfig;
+}
+
+async function cmdRunExperiment(
+  args: readonly string[],
+  options: ExperimentRunOptions,
+): Promise<void> {
   const experimentPath =
     args.find((a) => a.startsWith('--experiment='))?.split('=')[1] ??
     'experiments/definitions/default.yaml';
+  const requestedSplit = args.find((arg) => arg.startsWith('--split='))?.split('=')[1];
 
   // 1. Load config
   console.log(`Loading experiment: ${experimentPath}`);
@@ -172,27 +204,39 @@ async function cmdBaseline(args: string[]): Promise<void> {
   const expConfig = parseExperimentConfig(raw);
   console.log(`  Experiment: ${expConfig.id}`);
   console.log(`  Models: ${expConfig.models.map((m) => m.id).join(', ')}`);
-  console.log(`  Trials per model×task: ${expConfig.trials}`);
+  const trials = expConfig.trials[options.trials];
+  console.log(`  Trials per model×task: ${trials}`);
 
   // 2. Create provider adapters
   console.log('\nInitializing providers...');
+  const missingCredentials = expConfig.models
+    .map((model) => providerCredential(model.provider))
+    .filter((credential): credential is string => !Bun.env[credential]);
+  if (missingCredentials.length > 0) {
+    console.error(`Missing provider credentials: ${[...new Set(missingCredentials)].join(', ')}`);
+    console.error('Set credentials and run: bun harnessfit providers check');
+    process.exit(1);
+  }
+
   const models: ModelSpec[] = [];
   for (const m of expConfig.models) {
-    const adapter = createProvider(m);
+    const providerModel = resolveProviderModel(m);
+    const adapter = createProvider({ ...m, model: providerModel });
     models.push({
       id: m.id,
       provider: m.provider,
-      model: m.model,
+      model: providerModel,
       adapter,
     });
-    console.log(`  ${m.id}: ${m.provider}/${m.model} ✓`);
+    console.log(`  ${m.id}: ${m.provider}/${providerModel} ✓`);
   }
 
   // 3. Load tasks
-  const tasksDir = expConfig.benchmark?.tasksDir ?? 'benchmarks/tasks';
-  console.log(`\nLoading tasks from ${tasksDir}/...`);
+  const tasksDir = 'benchmarks/tasks';
+  const split = requestedSplit ?? expConfig.benchmark[options.defaultSplit];
+  console.log(`\nLoading ${split} tasks from ${tasksDir}/...`);
   const coordinator = new ExperimentCoordinator();
-  const tasks = await coordinator.loadTasks(tasksDir);
+  const tasks = await coordinator.loadTasks(tasksDir, split);
   if (tasks.length === 0) {
     console.error('  No tasks found. Create task definitions in benchmarks/tasks/');
     coordinator.close();
@@ -208,13 +252,22 @@ async function cmdBaseline(args: string[]): Promise<void> {
     id: expConfig.id,
     models,
     tasks,
-    trials: expConfig.trials,
-    harness: GENERIC_HARNESS,
+    trials,
+    harness: options.harness,
+    limits: {
+      maxTurns: expConfig.limits.maxTurns,
+      maxToolCalls: expConfig.limits.maxToolCalls,
+      maxWallTimeSeconds: expConfig.limits.maxWallTimeSeconds,
+      maxOutputTokens: expConfig.limits.maxOutputTokens,
+      maxCostUsd: expConfig.limits.maxCostUsdPerRun,
+    },
   };
 
   // 5. Run
-  console.log(`\nRunning baseline experiment...`);
-  console.log(`  ${models.length} models × ${tasks.length} tasks × ${expConfig.trials} trials = ${models.length * tasks.length * expConfig.trials} runs\n`);
+  console.log(`\nRunning ${options.commandName} experiment...`);
+  console.log(
+    `  ${models.length} models × ${tasks.length} tasks × ${trials} trials = ${models.length * tasks.length * trials} runs\n`,
+  );
 
   const startTime = Date.now();
   const result = await coordinator.run(spec);
@@ -240,8 +293,7 @@ async function cmdBaseline(args: string[]): Promise<void> {
   console.log('----------------|------|---------|--------|-------');
   for (const [modelId, runs] of result.byModel) {
     const success = runs.filter((r) => r.success).length;
-    const avgScore =
-      runs.length > 0 ? runs.reduce((s, r) => s + r.score, 0) / runs.length : 0;
+    const avgScore = runs.length > 0 ? runs.reduce((s, r) => s + r.score, 0) / runs.length : 0;
     const cost = runs.reduce((s, r) => s + r.costUsd, 0);
     console.log(
       `${modelId.padEnd(15)} | ${String(runs.length).padStart(4)} | ${String(success).padStart(7)} | ${avgScore.toFixed(2).padStart(6)} | $${cost.toFixed(4)}`,
@@ -249,7 +301,7 @@ async function cmdBaseline(args: string[]): Promise<void> {
   }
 
   // Save results
-  const outputPath = `experiments/results/${expConfig.id}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  const outputPath = `experiments/results/${expConfig.id}-${options.commandName}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
   await Bun.write(outputPath, JSON.stringify(result, replacer, 2));
   console.log(`\nResults saved: ${outputPath}`);
 
@@ -262,6 +314,30 @@ function replacer(_key: string, value: unknown): unknown {
     return Object.fromEntries(value);
   }
   return value;
+}
+
+function providerCredential(provider: ModelSpec['provider']): string {
+  switch (provider) {
+    case 'openai':
+      return 'OPENAI_API_KEY';
+    case 'anthropic':
+      return 'ANTHROPIC_API_KEY';
+    case 'google':
+      return 'GOOGLE_API_KEY';
+  }
+}
+
+function resolveProviderModel(model: {
+  readonly provider: ModelSpec['provider'];
+  readonly model: string;
+}): string {
+  const override =
+    model.provider === 'openai'
+      ? Bun.env.HARNESSFIT_OPENAI_MODEL
+      : model.provider === 'anthropic'
+        ? Bun.env.HARNESSFIT_ANTHROPIC_MODEL
+        : Bun.env.HARNESSFIT_GOOGLE_MODEL;
+  return override || model.model;
 }
 
 async function cmdOptimize(args: string[]): Promise<void> {
@@ -277,9 +353,31 @@ async function cmdOptimize(args: string[]): Promise<void> {
 }
 
 async function cmdEvaluate(args: string[]): Promise<void> {
-  const config = args.find((a) => a.startsWith('--config='))?.split('=')[1];
-  console.log(`Evaluating config: ${config || 'default'}`);
-  console.log('(Held-out evaluation coming in v0.2.0)');
+  const configPath = args.find((arg) => arg.startsWith('--config='))?.split('=')[1];
+  if (!configPath) {
+    console.log(
+      'Usage: harnessfit evaluate --config=<harness.json> [--experiment=<definition.yaml>] [--split=test]',
+    );
+    return;
+  }
+
+  const file = Bun.file(configPath);
+  if (!(await file.exists())) {
+    console.error(`Harness config not found: ${configPath}`);
+    process.exit(1);
+  }
+  const harness = parseConfig(await file.text());
+  if (!harness) {
+    console.error(`Harness config is not a valid HarnessConfig JSON document: ${configPath}`);
+    process.exit(1);
+  }
+
+  await cmdRunExperiment(args, {
+    commandName: 'evaluate',
+    defaultSplit: 'testSplit',
+    trials: 'headline',
+    harness,
+  });
 }
 
 async function cmdTransfer(_args: string[]): Promise<void> {
@@ -287,7 +385,74 @@ async function cmdTransfer(_args: string[]): Promise<void> {
 }
 
 async function cmdReport(_args: string[]): Promise<void> {
-  console.log('Report generation coming in v0.2.0');
+  const experimentId = _args.find((arg) => arg.startsWith('--experiment='))?.split('=')[1];
+  const dbPath = _args.find((arg) => arg.startsWith('--db='))?.split('=')[1] ?? 'harnessfit.db';
+  const outputPath = _args.find((arg) => arg.startsWith('--output='))?.split('=')[1];
+
+  if (!experimentId) {
+    console.log(
+      'Usage: harnessfit report --experiment=<id> [--db=harnessfit.db] [--output=report.json]',
+    );
+    return;
+  }
+
+  const db = new HarnessDB(dbPath);
+  const runs = db.getExperimentEvaluations(experimentId);
+  db.close();
+
+  if (runs.length === 0) {
+    console.error(`No persisted runs found for experiment: ${experimentId}`);
+    process.exit(1);
+  }
+
+  const byModel = new Map<string, Array<(typeof runs)[number]>>();
+  for (const run of runs) {
+    const modelRuns = byModel.get(run.modelId) ?? [];
+    modelRuns.push(run);
+    byModel.set(run.modelId, modelRuns);
+  }
+  const summarize = (items: readonly (typeof runs)[number][]) => {
+    const evaluated = items.filter((run) => run.evaluation !== null);
+    const successes = evaluated.filter((run) => run.evaluation?.success).length;
+    return {
+      runs: items.length,
+      evaluatedRuns: evaluated.length,
+      successfulRuns: successes,
+      successRate: evaluated.length === 0 ? 0 : successes / evaluated.length,
+      averageScore:
+        evaluated.length === 0
+          ? 0
+          : evaluated.reduce((sum, run) => sum + (run.evaluation?.total ?? 0), 0) /
+            evaluated.length,
+      totalCostUsd: items.reduce((sum, run) => sum + run.costUsd, 0),
+      averageDurationMs:
+        items.length === 0 ? 0 : items.reduce((sum, run) => sum + run.durationMs, 0) / items.length,
+    };
+  };
+  const report = {
+    experimentId,
+    generatedAt: new Date().toISOString(),
+    summary: summarize(runs),
+    byModel: Object.fromEntries(
+      [...byModel.entries()].map(([modelId, modelRuns]) => [modelId, summarize(modelRuns)]),
+    ),
+    runs,
+  };
+
+  console.log(`Experiment: ${experimentId}`);
+  console.log('Model           | Runs | Success | Score  | Cost');
+  console.log('----------------|------|---------|--------|-------');
+  for (const [modelId, modelRuns] of byModel) {
+    const summary = summarize(modelRuns);
+    console.log(
+      `${modelId.padEnd(15)} | ${String(summary.runs).padStart(4)} | ${(summary.successRate * 100).toFixed(1).padStart(6)}% | ${summary.averageScore.toFixed(2).padStart(6)} | $${summary.totalCostUsd.toFixed(4)}`,
+    );
+  }
+
+  if (outputPath) {
+    await Bun.write(outputPath, JSON.stringify(report, replacer, 2));
+    console.log(`Report saved: ${outputPath}`);
+  }
 }
 
 async function cmdInspect(runId: string | undefined): Promise<void> {

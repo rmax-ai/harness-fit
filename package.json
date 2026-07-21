@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "packages/*/*", "apps/*"],
+  "workspaces": ["packages/*", "packages/*/*", "apps/*", "site"],
   "bin": {
     "harnessfit": "./apps/cli/src/cli.ts"
   },

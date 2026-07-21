@@ -1,20 +1,20 @@
+import { EventStore } from '../events/event-store';
+import type { ToolRegistry } from '../tools/registry';
 import type {
-  ModelProvider,
-  NormalizedModelRequest,
+  ConfigHash,
   Message,
   MessageContent,
-  RunLimits,
-  RunTermination,
-  RunResult,
   ModelId,
-  TaskId,
-  ConfigHash,
-  ToolDefinition,
+  ModelProvider,
+  NormalizedModelRequest,
   NormalizedModelResponse,
+  RunLimits,
+  RunResult,
+  RunTermination,
+  TaskId,
+  ToolDefinition,
 } from '../types/index';
 import { DEFAULT_LIMITS, createRunId } from '../types/index';
-import { EventStore } from '../events/event-store';
-import { ToolRegistry } from '../tools/registry';
 
 /**
  * Agent edit loop — the core runtime per SPEC.md §9.
@@ -28,6 +28,8 @@ import { ToolRegistry } from '../tools/registry';
 export interface AgentLoopConfig {
   readonly model: ModelProvider;
   readonly modelId: ModelId;
+  /** Provider-facing model identifier; distinct from the stable experiment model ID. */
+  readonly providerModel: string;
   readonly tools: ToolRegistry;
   readonly limits?: Partial<RunLimits>;
   readonly systemPrompt: string;
@@ -45,6 +47,7 @@ export interface TaskContext {
 export class AgentLoop {
   private readonly model: ModelProvider;
   private readonly modelId: ModelId;
+  private readonly providerModel: string;
   private readonly tools: ToolRegistry;
   private readonly limits: RunLimits;
   private readonly systemPrompt: string;
@@ -52,6 +55,7 @@ export class AgentLoop {
   constructor(config: AgentLoopConfig) {
     this.model = config.model;
     this.modelId = config.modelId;
+    this.providerModel = config.providerModel;
     this.tools = config.tools;
     this.limits = { ...DEFAULT_LIMITS, ...config.limits };
     this.systemPrompt = config.systemPrompt;
@@ -106,7 +110,7 @@ export class AgentLoop {
         const toolDefs = this.getToolDefinitions();
 
         const request: NormalizedModelRequest = {
-          model: this.modelId,
+          model: this.providerModel,
           system: this.systemPrompt,
           messages,
           tools: toolDefs,

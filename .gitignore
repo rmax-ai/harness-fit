@@ -24,6 +24,7 @@ Thumbs.db
 # Experiment artifacts
 experiments/results/*
 !experiments/results/.gitkeep
+sandboxes/
 
 # SQLite databases
 *.db

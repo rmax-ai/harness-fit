@@ -5,5 +5,6 @@
   "title": "Fix Status Filter in Task Service",
   "description": "The task list command has a --status flag that should filter tasks by status (todo, in_progress, done, cancelled), but it currently ignores the flag and returns all tasks. Fix the filtering logic so that --status works correctly. The store already supports filtering — the bug is in the CLI argument handling.",
   "repository": "task-service",
+  "split": "train",
   "hiddenTestCommand": "bun test ../../hidden-tests/bug-001-status-filter/"
 }

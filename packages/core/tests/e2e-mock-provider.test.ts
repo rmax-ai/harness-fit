@@ -3,29 +3,31 @@
  *
  * Verifies the full pipeline produces a valid score without real API keys.
  */
-import { describe, it, expect } from 'bun:test';
-import type {
-  ModelProvider,
-  NormalizedModelRequest,
-  NormalizedModelResponse,
-  NormalizedUsage,
-  Money,
-  ProviderCapabilities,
-  StopReason,
-  MessageContent,
-  TaskId,
-  ConfigHash,
-} from '../src/types/index';
+import { describe, expect, it } from 'bun:test';
 import type { AgentLoopConfig, TaskContext } from '../src/runtime/agent-loop';
 import { AgentLoop } from '../src/runtime/agent-loop';
 import { createDefaultRegistry, getToolDefinitions } from '../src/tools/index';
+import type {
+  ConfigHash,
+  MessageContent,
+  ModelProvider,
+  Money,
+  NormalizedModelRequest,
+  NormalizedModelResponse,
+  NormalizedUsage,
+  ProviderCapabilities,
+  StopReason,
+  TaskId,
+} from '../src/types/index';
 
 // ── Mock Provider ──────────────────────────────────
 
 class MockProvider implements ModelProvider {
   private responseCount = 0;
+  lastRequest: NormalizedModelRequest | undefined;
 
-  async generate(_request: NormalizedModelRequest): Promise<NormalizedModelResponse> {
+  async generate(request: NormalizedModelRequest): Promise<NormalizedModelResponse> {
+    this.lastRequest = request;
     this.responseCount++;
 
     const content: MessageContent[] = [];
@@ -43,8 +45,7 @@ class MockProvider implements ModelProvider {
       });
     }
 
-    const stopReason: StopReason =
-      this.responseCount >= 2 ? 'end_turn' : 'tool_use';
+    const stopReason: StopReason = this.responseCount >= 2 ? 'end_turn' : 'tool_use';
 
     return {
       stopReason,
@@ -86,6 +87,7 @@ describe('E2E Integration: Mock Provider → Agent Loop → Score', () => {
     const config: AgentLoopConfig = {
       model: provider,
       modelId: 'mock-model' as TaskId as never,
+      providerModel: 'provider-facing-mock-model',
       tools,
       systemPrompt: 'You are a coding agent. Fix bugs.',
       limits: {
@@ -127,6 +129,7 @@ describe('E2E Integration: Mock Provider → Agent Loop → Score', () => {
     expect(result.costUsd).toBeGreaterThan(0);
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
     expect(result.events.length).toBeGreaterThan(0);
+    expect(provider.lastRequest?.model).toBe('provider-facing-mock-model');
 
     // Verify event log structure
     const startEvent = result.events.find((e) => e.type === 'run.started');
@@ -143,6 +146,7 @@ describe('E2E Integration: Mock Provider → Agent Loop → Score', () => {
     const config: AgentLoopConfig = {
       model: provider,
       modelId: 'mock-model' as TaskId as never,
+      providerModel: 'provider-facing-mock-model',
       tools,
       systemPrompt: 'You are a coding agent.',
       limits: {

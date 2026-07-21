@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@harnessfit/core": "workspace:*"
+    "@harnessfit/core": "workspace:*",
+    "@harnessfit/evaluator": "workspace:*"
   }
 }

@@ -5,6 +5,7 @@
   "title": "Fix TypeScript type error in task update",
   "description": "The `update` method in TaskStore accepts an `UpdateTaskInput` but there's a type mismatch in the CLI handler when passing update fields.",
   "repository": "task-service",
+  "split": "train",
   "seeded_defect": "The CLI update handler extracts fields from args but doesn't properly type them before passing to store.update().",
   "estimated_turns": 4,
   "hidden_test_command": "bun test tests/hidden/type-error.test.ts",

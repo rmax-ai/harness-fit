@@ -34,6 +34,7 @@ limits:
   maxTurns: 24
   maxToolCalls: 40
   maxWallTimeSeconds: 600
+  maxOutputTokens: 32000
   maxCostUsdPerRun: 5
 
 objective:

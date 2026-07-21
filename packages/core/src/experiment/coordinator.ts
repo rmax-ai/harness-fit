@@ -6,15 +6,20 @@
  */
 
 import type { ModelProvider } from '@harnessfit/core';
-import type { HarnessConfig } from '@harnessfit/harness';
 import { AgentLoop, createDefaultRegistry } from '@harnessfit/core';
 import type { AgentLoopConfig, TaskContext } from '@harnessfit/core';
-import { compileHarness } from '@harnessfit/harness';
-import { HarnessDB } from '@harnessfit/storage';
+import type { ConfigHash, ModelId, RunLimits, TaskId } from '@harnessfit/core';
 import { computeScore } from '@harnessfit/evaluator';
 import type { ScoringInput } from '@harnessfit/evaluator';
-import { DEFAULT_LIMITS } from '@harnessfit/core';
-import type { RunLimits, ModelId, TaskId, ConfigHash } from '@harnessfit/core';
+import {
+  createConstraintChecker,
+  createPatchQualityAnalyzer,
+  createRegressionChecker,
+  createTestRunner,
+} from '@harnessfit/evaluator';
+import type { HarnessConfig } from '@harnessfit/harness';
+import { compileHarness, hashConfig } from '@harnessfit/harness';
+import { HarnessDB } from '@harnessfit/storage';
 
 // ── Types ────────────────────────────────────────────
 
@@ -25,7 +30,9 @@ export interface TaskDefinition {
   readonly title: string;
   readonly description: string;
   readonly repository: string;
+  readonly split: string;
   readonly hiddenTestCommand?: string;
+  readonly hiddenTestsPath: string;
 }
 
 export interface ModelSpec {
@@ -41,12 +48,7 @@ export interface ExperimentSpec {
   readonly tasks: readonly TaskDefinition[];
   readonly trials: number;
   readonly harness: HarnessConfig;
-  readonly limits?: Partial<{
-    maxTurns: number;
-    maxToolCalls: number;
-    maxWallTimeSeconds: number;
-    maxCostUsdPerRun: number;
-  }>;
+  readonly limits?: Partial<RunLimits>;
   readonly dbPath?: string;
 }
 
@@ -92,15 +94,16 @@ export class ExperimentCoordinator {
   }
 
   /** Load tasks from a benchmarks directory. */
-  async loadTasks(tasksDir: string): Promise<TaskDefinition[]> {
+  async loadTasks(tasksDir: string, split?: string): Promise<TaskDefinition[]> {
     const tasks: TaskDefinition[] = [];
     const glob = new Bun.Glob('*/task.json');
     const scanDir = tasksDir.endsWith('/') ? tasksDir : `${tasksDir}/`;
 
     for await (const match of glob.scan({ cwd: scanDir, absolute: true })) {
       const file = Bun.file(match);
-      const raw = (await file.json()) as TaskDefinition;
-      tasks.push(raw);
+      const raw = (await file.json()) as Omit<TaskDefinition, 'hiddenTestsPath'>;
+      const task = { ...raw, hiddenTestsPath: `benchmarks/hidden-tests/${raw.id}` };
+      if (split === undefined || task.split === split) tasks.push(task);
     }
 
     return tasks;
@@ -114,16 +117,12 @@ export class ExperimentCoordinator {
     trialNumber: number,
     repoPath: string,
     experimentId: string,
+    limits?: Partial<RunLimits>,
   ): Promise<TrialResult> {
-    const runLimits: Partial<RunLimits> = {
-      maxTurns: DEFAULT_LIMITS.maxTurns,
-      maxToolCalls: DEFAULT_LIMITS.maxToolCalls,
-      maxWallTimeSeconds: DEFAULT_LIMITS.maxWallTimeSeconds,
-      maxCostUsd: DEFAULT_LIMITS.maxCostUsd,
-    };
-
     // Compile harness
-    const compiled = compileHarness(harness, [], '');
+    const harnessHash = hashConfig(harness);
+    const compiled = compileHarness(harness, [], harnessHash);
+    this.db.saveConfig(harnessHash, JSON.stringify(harness));
 
     // Create tool registry
     const tools = createDefaultRegistry();
@@ -132,9 +131,10 @@ export class ExperimentCoordinator {
     const agentConfig: AgentLoopConfig = {
       model: model.adapter,
       modelId: model.id as ModelId,
+      providerModel: model.model,
       tools,
       systemPrompt: compiled.systemPrompt,
-      limits: runLimits,
+      limits,
     };
 
     const agentLoop = new AgentLoop(agentConfig);
@@ -148,49 +148,58 @@ export class ExperimentCoordinator {
       repoPath,
       taskDescription: taskPrompt,
       configHash: compiled.hash as ConfigHash,
-      seed: trialNumber * 1000 + (Date.now() % 1000),
+      seed: deterministicSeed(model.id, task.id, trialNumber),
       trialNumber,
     };
 
     // Execute
     const runResult = await agentLoop.execute(taskContext);
 
-    // Persist to DB
-    this.db.saveRun(runResult, experimentId);
+    const patch = readGitOutput(repoPath, ['diff', '--no-ext-diff']);
+    const changedFiles = readGitOutput(repoPath, ['diff', '--name-only'])
+      .split('\n')
+      .filter((path) => path.length > 0);
+    const [hiddenTests, regression, checkedConstraints, patchQuality] = await Promise.all([
+      createTestRunner().runHiddenTests(repoPath, task.hiddenTestsPath),
+      createRegressionChecker().check(repoPath),
+      createConstraintChecker().check(repoPath, patch, changedFiles),
+      createPatchQualityAnalyzer().analyze(repoPath, patch),
+    ]);
 
-    // Evaluate
-    const evalInput: ScoringInput = {
-      functionalTests:
+    const functionalTests =
+      runResult.termination === 'completed'
+        ? hiddenTests
+        : { passed: 0, total: Math.max(hiddenTests.total, 1), failures: [runResult.termination] };
+    const constraints = {
+      violations:
         runResult.termination === 'completed'
-          ? {
-              passed: runResult.toolCalls > 0 ? 1 : 0,
-              total: 1,
-              failures: runResult.toolCalls > 0 ? [] : ['no_tool_calls'],
-            }
-          : { passed: 0, total: 1, failures: [runResult.termination] },
-      regression: {
-        typecheckPassed: false,
-        lintPassed: false,
-        existingTests: { passed: 0, total: 0, failures: [] },
-      },
-      constraints: {
-        violations: runResult.termination !== 'completed' ? ['non_completion'] : [],
-      },
-      patchQuality: {
-        lineCount: (runResult.patch ?? '').split('\n').length,
-        newDuplicationDetected: false,
-        newLintViolations: 0,
-      },
+          ? checkedConstraints.violations
+          : [...checkedConstraints.violations, `run_not_completed:${runResult.termination}`],
     };
-    const score = computeScore(evalInput).total;
+    const evalInput: ScoringInput = {
+      functionalTests,
+      regression,
+      constraints,
+      patchQuality,
+    };
+    const taskScore = computeScore(evalInput);
+    const success =
+      runResult.termination === 'completed' &&
+      functionalTests.total > 0 &&
+      functionalTests.passed === functionalTests.total &&
+      constraints.violations.length === 0;
+
+    // Persist the complete execution trace before returning the score projection.
+    this.db.saveRun({ ...runResult, patch }, experimentId);
+    this.db.saveEvaluation(runResult.runId, success, taskScore);
 
     return {
       runId: runResult.runId,
       modelId: model.id,
       taskId: task.id,
       trialNumber,
-      success: runResult.termination === 'completed',
-      score,
+      success,
+      score: taskScore.total,
       durationMs: runResult.durationMs,
       turns: runResult.turns,
       toolCalls: runResult.toolCalls,
@@ -210,14 +219,18 @@ export class ExperimentCoordinator {
       for (const task of spec.tasks) {
         for (let trial = 0; trial < spec.trials; trial++) {
           const repoPath = `sandboxes/${task.repository}-${trial}-${Date.now()}`;
-          // Create sandbox directory
-          await Bun.$`mkdir -p ${repoPath}`.quiet();
-          // Copy benchmark repo
-          const benchRepo = `benchmarks/repositories/${task.repository}`;
-          await Bun.$`cp -r ${benchRepo}/* ${repoPath}/`.quiet();
+          this.prepareSandbox(task.repository, repoPath);
 
           try {
-            const result = await this.runTrial(model, task, spec.harness, trial, repoPath, spec.id);
+            const result = await this.runTrial(
+              model,
+              task,
+              spec.harness,
+              trial,
+              repoPath,
+              spec.id,
+              spec.limits,
+            );
             allResults.push(result);
             console.log(
               `  [${model.id}/${task.id}/t${trial}] ${result.termination} (${result.score.toFixed(2)})`,
@@ -263,6 +276,8 @@ export class ExperimentCoordinator {
           : 0,
     };
 
+    this.db.completeExperiment(spec.id);
+
     return {
       experimentId: spec.id,
       runs: allResults,
@@ -294,7 +309,44 @@ You are working in a TypeScript/Bun project at the current working directory.
 - Keep changes minimal`;
   }
 
+  private prepareSandbox(repository: string, repoPath: string): void {
+    const sourcePath = `benchmarks/repositories/${repository}`;
+    runCommand(['mkdir', '-p', repoPath]);
+    runCommand(['cp', '-R', `${sourcePath}/.`, repoPath]);
+    runCommand(['git', 'init', '-q'], repoPath);
+    runCommand(['git', 'config', 'user.email', 'harnessfit@example.invalid'], repoPath);
+    runCommand(['git', 'config', 'user.name', 'HarnessFit'], repoPath);
+    runCommand(['git', 'add', '.'], repoPath);
+    runCommand(['git', 'commit', '-qm', 'fixture baseline'], repoPath);
+  }
+
   close(): void {
     this.db.close();
   }
+}
+
+function readGitOutput(repoPath: string, args: readonly string[]): string {
+  const proc = Bun.spawnSync({
+    cmd: ['git', ...args],
+    cwd: repoPath,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  return proc.exitCode === 0 ? proc.stdout.toString() : '';
+}
+
+function runCommand(command: readonly string[], cwd?: string): void {
+  const proc = Bun.spawnSync({ cmd: [...command], cwd, stdout: 'pipe', stderr: 'pipe' });
+  if (proc.exitCode !== 0) {
+    throw new Error(`${command.join(' ')} failed: ${proc.stderr.toString()}`);
+  }
+}
+
+function deterministicSeed(modelId: string, taskId: string, trialNumber: number): number {
+  let hash = 2166136261;
+  for (const character of `${modelId}:${taskId}:${trialNumber}`) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }

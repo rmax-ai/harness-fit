@@ -5,6 +5,7 @@
   "title": "Extract validation logic into a separate module",
   "description": "The CLI update handler has inline string validation. Extract all value validation (status, priority) into the validation module alongside existing validators. The public API and all tests must pass unchanged.",
   "repository": "task-service",
+  "split": "test",
   "estimated_turns": 12,
   "hidden_test_command": "bun test tests/hidden/extract-validation.test.ts",
   "reject_criteria": [

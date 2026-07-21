@@ -1,5 +1,6 @@
-import type { HarnessConfig, ParameterKey } from '../configs/types';
 import { cloneConfig, getConfigValue, setConfigValue } from '../configs/config';
+import { GENERIC_HARNESS } from '../configs/types';
+import type { HarnessConfig, ParameterKey } from '../configs/types';
 
 /**
  * Neighbor generation for hill climbing (SPEC.md §11, §12).
@@ -73,20 +74,44 @@ export function generateNeighbors(config: HarnessConfig): readonly HarnessConfig
  * Generate a random harness configuration.
  * Used for random restarts in hill climbing (SPEC.md §11, Phase 3).
  */
-export function generateRandomConfig(baseConfig?: HarnessConfig): HarnessConfig {
-  const config = baseConfig ? cloneConfig(baseConfig) : cloneConfig(baseConfig!);
+export function generateRandomConfig(baseConfig?: HarnessConfig, seed = 0): HarnessConfig {
+  let config = cloneConfig(baseConfig ?? GENERIC_HARNESS);
   const keys = Object.keys(PARAMETER_VALUES) as ParameterKey[];
+  const random = createSeededRandom(seed);
 
   // Mutate 3-5 random parameters
-  const mutations = 3 + Math.floor(Math.random() * 3);
-  const shuffled = [...keys].sort(() => Math.random() - 0.5);
+  const mutations = 3 + Math.floor(random() * 3);
+  const shuffled = [...keys];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    const current = shuffled[i];
+    const replacement = shuffled[j];
+    if (current === undefined || replacement === undefined) {
+      throw new Error('Parameter shuffle produced an invalid index');
+    }
+    shuffled[i] = replacement;
+    shuffled[j] = current;
+  }
 
   for (let i = 0; i < Math.min(mutations, shuffled.length); i++) {
-    const key = shuffled[i]!;
+    const key = shuffled[i];
+    if (key === undefined) throw new Error('Parameter mutation selected an invalid key');
     const options = PARAMETER_VALUES[key];
-    const value = options[Math.floor(Math.random() * options.length)];
-    setConfigValue(config, key, value);
+    const value = options[Math.floor(random() * options.length)];
+    if (value === undefined) throw new Error(`No values configured for ${key}`);
+    config = setConfigValue(config, key, value);
   }
 
   return config;
+}
+
+function createSeededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
+  };
 }
