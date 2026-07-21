@@ -328,7 +328,74 @@ async function cmdTransfer(_args: string[]): Promise<void> {
 }
 
 async function cmdReport(_args: string[]): Promise<void> {
-  console.log('Report generation coming in v0.2.0');
+  const experimentId = _args.find((arg) => arg.startsWith('--experiment='))?.split('=')[1];
+  const dbPath = _args.find((arg) => arg.startsWith('--db='))?.split('=')[1] ?? 'harnessfit.db';
+  const outputPath = _args.find((arg) => arg.startsWith('--output='))?.split('=')[1];
+
+  if (!experimentId) {
+    console.log(
+      'Usage: harnessfit report --experiment=<id> [--db=harnessfit.db] [--output=report.json]',
+    );
+    return;
+  }
+
+  const db = new HarnessDB(dbPath);
+  const runs = db.getExperimentEvaluations(experimentId);
+  db.close();
+
+  if (runs.length === 0) {
+    console.error(`No persisted runs found for experiment: ${experimentId}`);
+    process.exit(1);
+  }
+
+  const byModel = new Map<string, Array<(typeof runs)[number]>>();
+  for (const run of runs) {
+    const modelRuns = byModel.get(run.modelId) ?? [];
+    modelRuns.push(run);
+    byModel.set(run.modelId, modelRuns);
+  }
+  const summarize = (items: readonly (typeof runs)[number][]) => {
+    const evaluated = items.filter((run) => run.evaluation !== null);
+    const successes = evaluated.filter((run) => run.evaluation?.success).length;
+    return {
+      runs: items.length,
+      evaluatedRuns: evaluated.length,
+      successfulRuns: successes,
+      successRate: evaluated.length === 0 ? 0 : successes / evaluated.length,
+      averageScore:
+        evaluated.length === 0
+          ? 0
+          : evaluated.reduce((sum, run) => sum + (run.evaluation?.total ?? 0), 0) /
+            evaluated.length,
+      totalCostUsd: items.reduce((sum, run) => sum + run.costUsd, 0),
+      averageDurationMs:
+        items.length === 0 ? 0 : items.reduce((sum, run) => sum + run.durationMs, 0) / items.length,
+    };
+  };
+  const report = {
+    experimentId,
+    generatedAt: new Date().toISOString(),
+    summary: summarize(runs),
+    byModel: Object.fromEntries(
+      [...byModel.entries()].map(([modelId, modelRuns]) => [modelId, summarize(modelRuns)]),
+    ),
+    runs,
+  };
+
+  console.log(`Experiment: ${experimentId}`);
+  console.log('Model           | Runs | Success | Score  | Cost');
+  console.log('----------------|------|---------|--------|-------');
+  for (const [modelId, modelRuns] of byModel) {
+    const summary = summarize(modelRuns);
+    console.log(
+      `${modelId.padEnd(15)} | ${String(summary.runs).padStart(4)} | ${(summary.successRate * 100).toFixed(1).padStart(6)}% | ${summary.averageScore.toFixed(2).padStart(6)} | $${summary.totalCostUsd.toFixed(4)}`,
+    );
+  }
+
+  if (outputPath) {
+    await Bun.write(outputPath, JSON.stringify(report, replacer, 2));
+    console.log(`Report saved: ${outputPath}`);
+  }
 }
 
 async function cmdInspect(runId: string | undefined): Promise<void> {

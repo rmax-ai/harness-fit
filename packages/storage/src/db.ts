@@ -301,6 +301,62 @@ export class HarnessDB {
     return rows.map((r) => this.getRun(r.id)).filter((r): r is RunResult => r !== null);
   }
 
+  /** Get persisted runs together with their deterministic evaluation, when available. */
+  getExperimentEvaluations(experimentId: string): readonly StoredExperimentEvaluation[] {
+    const rows = this.db
+      .query(
+        `SELECT
+          runs.id AS run_id,
+          runs.model_id,
+          runs.task_id,
+          runs.trial_number,
+          runs.termination,
+          runs.failure_label,
+          runs.duration_ms,
+          runs.turns,
+          runs.tool_calls,
+          runs.cost_usd,
+          run_evaluations.success,
+          run_evaluations.total_score,
+          run_evaluations.functional_score,
+          run_evaluations.regression_score,
+          run_evaluations.constraint_score,
+          run_evaluations.quality_score,
+          run_evaluations.details_json
+        FROM runs
+        LEFT JOIN run_evaluations ON run_evaluations.run_id = runs.id
+        WHERE runs.experiment_id = ?
+        ORDER BY runs.model_id, runs.task_id, runs.trial_number`,
+      )
+      .all(experimentId) as StoredExperimentEvaluationRow[];
+
+    return rows.map((row) => ({
+      runId: row.run_id,
+      modelId: row.model_id,
+      taskId: row.task_id,
+      trialNumber: row.trial_number,
+      termination: row.termination as RunResult['termination'],
+      failureLabel: (row.failure_label ?? undefined) as RunResult['failureLabel'],
+      durationMs: row.duration_ms,
+      turns: row.turns,
+      toolCalls: row.tool_calls,
+      costUsd: row.cost_usd,
+      evaluation:
+        row.success === null
+          ? null
+          : {
+              runId: row.run_id,
+              success: row.success === 1,
+              total: row.total_score ?? 0,
+              functional: row.functional_score ?? 0,
+              regression: row.regression_score ?? 0,
+              constraint: row.constraint_score ?? 0,
+              quality: row.quality_score ?? 0,
+              details: JSON.parse(row.details_json ?? '{}') as TaskScore['details'],
+            },
+    }));
+  }
+
   /** Get aggregate metrics for an experiment. */
   getExperimentSummary(experimentId: string): ExperimentSummary {
     const row = this.db
@@ -365,6 +421,20 @@ export interface StoredEvaluation {
   readonly details: TaskScore['details'];
 }
 
+export interface StoredExperimentEvaluation {
+  readonly runId: string;
+  readonly modelId: string;
+  readonly taskId: string;
+  readonly trialNumber: number;
+  readonly termination: RunResult['termination'];
+  readonly failureLabel?: RunResult['failureLabel'];
+  readonly durationMs: number;
+  readonly turns: number;
+  readonly toolCalls: number;
+  readonly costUsd: number;
+  readonly evaluation: StoredEvaluation | null;
+}
+
 interface StoredEvaluationRow {
   readonly run_id: string;
   readonly success: number;
@@ -374,4 +444,24 @@ interface StoredEvaluationRow {
   readonly constraint_score: number;
   readonly quality_score: number;
   readonly details_json: string;
+}
+
+interface StoredExperimentEvaluationRow {
+  readonly run_id: string;
+  readonly model_id: string;
+  readonly task_id: string;
+  readonly trial_number: number;
+  readonly termination: string;
+  readonly failure_label: string | null;
+  readonly duration_ms: number;
+  readonly turns: number;
+  readonly tool_calls: number;
+  readonly cost_usd: number;
+  readonly success: number | null;
+  readonly total_score: number | null;
+  readonly functional_score: number | null;
+  readonly regression_score: number | null;
+  readonly constraint_score: number | null;
+  readonly quality_score: number | null;
+  readonly details_json: string | null;
 }
