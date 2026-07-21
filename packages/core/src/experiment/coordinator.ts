@@ -6,7 +6,7 @@
  */
 
 import type { ModelProvider } from '@harnessfit/core';
-import { AgentLoop, createDefaultRegistry } from '@harnessfit/core';
+import { AgentLoop, createDefaultRegistry, getToolDefinitions } from '@harnessfit/core';
 import type { AgentLoopConfig, TaskContext } from '@harnessfit/core';
 import type { ConfigHash, ModelId, RunLimits, TaskId } from '@harnessfit/core';
 import { computeScore } from '@harnessfit/evaluator';
@@ -121,7 +121,7 @@ export class ExperimentCoordinator {
   ): Promise<TrialResult> {
     // Compile harness
     const harnessHash = hashConfig(harness);
-    const compiled = compileHarness(harness, [], harnessHash);
+    const compiled = compileHarness(harness, getToolDefinitions(), harnessHash);
     this.db.saveConfig(harnessHash, JSON.stringify(harness));
 
     // Create tool registry
