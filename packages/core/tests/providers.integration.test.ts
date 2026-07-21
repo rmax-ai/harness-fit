@@ -122,7 +122,7 @@ describe('Provider Integration (live API)', () => {
       system: 'Reply with exactly "OK".',
       messages: [{ role: 'user', content: 'Say OK' }],
       tools: [],
-      maxOutputTokens: 10,
+      maxOutputTokens: 256,
       temperature: 0,
     });
 

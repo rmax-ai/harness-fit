@@ -7,17 +7,17 @@
  * The SDK can be swapped in later for better error handling and streaming.
  */
 import type {
+  Message,
+  MessageContent,
   ModelProvider,
+  Money,
   NormalizedModelRequest,
   NormalizedModelResponse,
   NormalizedUsage,
-  Money,
   ProviderCapabilities,
   StopReason,
-  Message,
-  MessageContent,
-  ToolDefinition,
   ToolCallContent,
+  ToolDefinition,
 } from '@harnessfit/core';
 
 export class OpenAIProvider implements ModelProvider {
@@ -55,8 +55,8 @@ export class OpenAIProvider implements ModelProvider {
       model: req.model,
       messages: req.messages.map((m) => this.convertMessage(m)),
       tools: req.tools.length > 0 ? req.tools.map((t) => this.convertTool(t)) : undefined,
-      max_tokens: req.maxOutputTokens,
-      temperature: req.temperature,
+      max_completion_tokens: req.maxOutputTokens,
+      temperature: req.model.startsWith('gpt-5') ? undefined : req.temperature,
     };
   }
 
