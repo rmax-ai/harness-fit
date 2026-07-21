@@ -5,6 +5,7 @@
   "title": "Add priority filtering to list command",
   "description": "The CLI list command supports --status but not --priority. Add --priority filter support to both the CLI and the underlying filter logic. The TaskStore.list() already has the filter field but the CLI doesn't expose it.",
   "repository": "task-service",
+  "split": "train",
   "estimated_turns": 8,
   "hidden_test_command": "bun test tests/hidden/priority-filter.test.ts",
   "reject_criteria": [

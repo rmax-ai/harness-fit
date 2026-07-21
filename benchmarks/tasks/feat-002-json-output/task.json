@@ -5,6 +5,7 @@
   "title": "Add --json output flag to list and get commands",
   "description": "Add a --json flag that outputs task data as JSON instead of human-readable text. Should work for list, get, and stats commands.",
   "repository": "task-service",
+  "split": "dev",
   "estimated_turns": 10,
   "hidden_test_command": "bun test tests/hidden/json-output.test.ts",
   "reject_criteria": [

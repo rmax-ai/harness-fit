@@ -30,6 +30,7 @@ export interface TaskDefinition {
   readonly title: string;
   readonly description: string;
   readonly repository: string;
+  readonly split: string;
   readonly hiddenTestCommand?: string;
   readonly hiddenTestsPath: string;
 }
@@ -93,7 +94,7 @@ export class ExperimentCoordinator {
   }
 
   /** Load tasks from a benchmarks directory. */
-  async loadTasks(tasksDir: string): Promise<TaskDefinition[]> {
+  async loadTasks(tasksDir: string, split?: string): Promise<TaskDefinition[]> {
     const tasks: TaskDefinition[] = [];
     const glob = new Bun.Glob('*/task.json');
     const scanDir = tasksDir.endsWith('/') ? tasksDir : `${tasksDir}/`;
@@ -101,7 +102,8 @@ export class ExperimentCoordinator {
     for await (const match of glob.scan({ cwd: scanDir, absolute: true })) {
       const file = Bun.file(match);
       const raw = (await file.json()) as Omit<TaskDefinition, 'hiddenTestsPath'>;
-      tasks.push({ ...raw, hiddenTestsPath: `benchmarks/hidden-tests/${raw.id}` });
+      const task = { ...raw, hiddenTestsPath: `benchmarks/hidden-tests/${raw.id}` };
+      if (split === undefined || task.split === split) tasks.push(task);
     }
 
     return tasks;

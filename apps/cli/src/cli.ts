@@ -169,6 +169,7 @@ async function cmdBaseline(args: string[]): Promise<void> {
   const experimentPath =
     args.find((a) => a.startsWith('--experiment='))?.split('=')[1] ??
     'experiments/definitions/default.yaml';
+  const requestedSplit = args.find((arg) => arg.startsWith('--split='))?.split('=')[1];
 
   // 1. Load config
   console.log(`Loading experiment: ${experimentPath}`);
@@ -210,9 +211,10 @@ async function cmdBaseline(args: string[]): Promise<void> {
 
   // 3. Load tasks
   const tasksDir = 'benchmarks/tasks';
-  console.log(`\nLoading tasks from ${tasksDir}/...`);
+  const split = requestedSplit ?? expConfig.benchmark.trainingSplit;
+  console.log(`\nLoading ${split} tasks from ${tasksDir}/...`);
   const coordinator = new ExperimentCoordinator();
-  const tasks = await coordinator.loadTasks(tasksDir);
+  const tasks = await coordinator.loadTasks(tasksDir, split);
   if (tasks.length === 0) {
     console.error('  No tasks found. Create task definitions in benchmarks/tasks/');
     coordinator.close();

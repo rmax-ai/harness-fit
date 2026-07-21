@@ -5,6 +5,7 @@
   "title": "Repository comprehension: Status enum dependencies",
   "description": "Answer architectural questions about which modules depend on the task status enum and what would break if a new status were added.",
   "repository": "task-service",
+  "split": "dev",
   "estimated_turns": 6,
   "expected_answers": {
     "dependent_modules": ["types.ts", "store.ts", "cli.ts", "validation.ts"],
