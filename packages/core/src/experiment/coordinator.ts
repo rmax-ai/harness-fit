@@ -131,6 +131,7 @@ export class ExperimentCoordinator {
     const agentConfig: AgentLoopConfig = {
       model: model.adapter,
       modelId: model.id as ModelId,
+      providerModel: model.model,
       tools,
       systemPrompt: compiled.systemPrompt,
       limits,
