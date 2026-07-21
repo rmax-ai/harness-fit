@@ -1,17 +1,17 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import {
-  computeScore,
-  computeFunctionalScore,
-  computeRegressionScore,
   computeConstraintScore,
+  computeFunctionalScore,
   computeQualityScore,
+  computeRegressionScore,
+  computeScore,
 } from '../src/deterministic/scorer';
 import type {
-  ScoringInput,
-  TestSuiteResult,
-  RegressionResult,
   ConstraintResult,
   PatchQualityMetrics,
+  RegressionResult,
+  ScoringInput,
+  TestSuiteResult,
 } from '../src/deterministic/scorer';
 
 /**
@@ -42,16 +42,18 @@ describe('Scorer determinism (M1 acceptance criterion)', () => {
     }
 
     // All 10 scores must be exactly equal
-    const first = scores[0];
+    const first = scores.at(0);
+    if (first === undefined) throw new Error('Expected at least one score');
     for (const score of scores) {
-      expect(score).toBe(first!);
+      expect(score).toBe(first);
     }
   });
 
   it('produces identical sub-scores across 10 repeated evaluations', () => {
     const results = Array.from({ length: 10 }, () => computeScore(input));
 
-    const first = results[0]!;
+    const first = results.at(0);
+    if (first === undefined) throw new Error('Expected at least one score');
     for (const result of results) {
       expect(result.functional).toBe(first.functional);
       expect(result.regression).toBe(first.regression);
@@ -161,6 +163,15 @@ describe('computeConstraintScore', () => {
 });
 
 describe('computeQualityScore', () => {
+  it('returns 0.0 when no patch was produced', () => {
+    const metrics: PatchQualityMetrics = {
+      lineCount: 0,
+      newDuplicationDetected: false,
+      newLintViolations: 0,
+    };
+    expect(computeQualityScore(metrics)).toBe(0.0);
+  });
+
   it('returns 1.0 for small, clean patch', () => {
     const metrics: PatchQualityMetrics = {
       lineCount: 10,

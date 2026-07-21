@@ -88,10 +88,10 @@ export class AgentLoop {
     let totalOutputTokens = 0;
     let totalCachedTokens = 0;
     let totalCostUsd = 0;
-    let termination: RunTermination = 'completed';
+    let termination: RunTermination | undefined;
 
     try {
-      for (turns = 0; turns < this.limits.maxTurns; turns++) {
+      for (turns = 0; turns < this.limits.maxTurns; ) {
         // Check wall time
         const elapsed = (Date.now() - startTime.getTime()) / 1000;
         if (elapsed > this.limits.maxWallTimeSeconds) {
@@ -147,8 +147,10 @@ export class AgentLoop {
           outputTokens: response.usage.outputTokens,
           cost: totalCostUsd,
         });
+        turns++;
 
-        // Process tool calls
+        // Process tool calls. Completion is only valid when the model explicitly
+        // calls finish; text-only end turns are recorded as premature completion.
         if (response.stopReason === 'tool_use') {
           const toolCalls = response.content.filter(
             (c): c is MessageContent & { type: 'tool_call' } => c.type === 'tool_call',
@@ -156,6 +158,15 @@ export class AgentLoop {
 
           // Add assistant message with tool calls
           messages.push({ role: 'assistant', content: response.content });
+
+          if (toolCalls.length === 0) {
+            termination = 'premature_completion';
+            events.emit('limit.reached', {
+              limit: 'premature_completion',
+              reason: 'tool_use_without_call',
+            });
+            break;
+          }
 
           for (const toolCall of toolCalls) {
             if (totalToolCalls >= this.limits.maxToolCalls) {
@@ -193,38 +204,31 @@ export class AgentLoop {
                 },
               ],
             });
+
+            if (toolCall.name === 'finish') {
+              termination = 'completed';
+              events.emit('run.completed', {
+                turns,
+                toolCalls: totalToolCalls,
+                cost: totalCostUsd,
+              });
+              break;
+            }
           }
 
-          if (termination === 'tool_call_limit') break;
+          if (termination === 'tool_call_limit' || termination === 'completed') break;
           continue;
         }
 
-        // No tool calls — model is done
-        // Check for finish signal
-        const finishContent = response.content.find(
-          (c) => c.type === 'tool_call' && c.name === 'finish',
-        );
-
-        if (finishContent) {
-          termination = 'completed';
-          events.emit('run.completed', {
-            turns,
-            toolCalls: totalToolCalls,
-            cost: totalCostUsd,
-          });
-        } else {
-          termination = 'completed';
-          events.emit('run.completed', {
-            turns,
-            toolCalls: totalToolCalls,
-            cost: totalCostUsd,
-            note: 'model_ended_without_finish',
-          });
-        }
+        termination = 'premature_completion';
+        events.emit('limit.reached', {
+          limit: 'premature_completion',
+          reason: 'model_ended_without_finish',
+        });
         break;
       }
 
-      if (turns >= this.limits.maxTurns) {
+      if (termination === undefined && turns >= this.limits.maxTurns) {
         termination = 'turn_limit';
         events.emit('limit.reached', { limit: 'turns', count: turns });
       }
@@ -246,7 +250,7 @@ export class AgentLoop {
       configHash: task.configHash,
       seed: task.seed,
       trialNumber: task.trialNumber,
-      termination,
+      termination: termination ?? 'internal_error',
       startTime: startTime.toISOString(),
       endTime: endTime.toISOString(),
       durationMs,

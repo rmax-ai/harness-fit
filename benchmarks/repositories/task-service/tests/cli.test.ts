@@ -40,9 +40,9 @@ describe('TaskCli', () => {
       expect(output).toContain('No tasks found');
     });
 
-    it('filters by status', () => {
-      cli.run(['add', 'Task A', 'Desc']);
-      const output = cli.run(['list', '--status', 'done']);
+    it('filters by priority', () => {
+      cli.run(['add', 'Task A', 'Desc', '--priority', 'high']);
+      const output = cli.run(['list', '--priority', 'low']);
       expect(output).toContain('No tasks found');
     });
   });

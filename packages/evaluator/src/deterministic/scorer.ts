@@ -172,6 +172,8 @@ export function computeConstraintScore(constraints: ConstraintResult): number {
  * - Penalty for new lint violations (-0.1 each, max -0.3)
  */
 export function computeQualityScore(metrics: PatchQualityMetrics): number {
+  if (metrics.lineCount === 0) return 0.0;
+
   let score = 1.0;
 
   // Patch size penalty

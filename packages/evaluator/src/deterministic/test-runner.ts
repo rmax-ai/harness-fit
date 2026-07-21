@@ -2,7 +2,11 @@ import type { TestSuiteResult } from './scorer';
 
 /** Runs hidden acceptance tests against a modified repository. */
 export interface TestRunner {
-  runHiddenTests(repoPath: string, hiddenTestsPath: string): Promise<TestSuiteResult>;
+  runHiddenTests(
+    repoPath: string,
+    hiddenTestsPath: string,
+    repositoryName?: string,
+  ): Promise<TestSuiteResult>;
 }
 
 /**
@@ -13,10 +17,15 @@ export interface TestRunner {
  * sandbox under evaluation rather than the source fixture.
  */
 export class BunTestRunner implements TestRunner {
-  async runHiddenTests(repoPath: string, hiddenTestsPath: string): Promise<TestSuiteResult> {
+  async runHiddenTests(
+    repoPath: string,
+    hiddenTestsPath: string,
+    repositoryName?: string,
+  ): Promise<TestSuiteResult> {
     const tempRoot = (await Bun.$`mktemp -d`.text()).trim();
-    const fixtureName = repoPath.split('/').filter(Boolean).at(-1);
+    const fixtureName = repositoryName ?? repoPath.split('/').filter(Boolean).at(-1);
     if (!fixtureName) return failedResult('invalid repository path');
+    const absoluteRepoPath = repoPath.startsWith('/') ? repoPath : `${process.cwd()}/${repoPath}`;
 
     try {
       const copiedTestsPath = `${tempRoot}/hidden-tests/${hiddenTestsPath.split('/').filter(Boolean).at(-1)}`;
@@ -25,7 +34,7 @@ export class BunTestRunner implements TestRunner {
         cmd: [
           'sh',
           '-c',
-          `mkdir -p "${tempRoot}/hidden-tests" "${tempRoot}/repositories" && cp -R "${hiddenTestsPath}" "${tempRoot}/hidden-tests/" && ln -s "${repoPath}" "${repositoryLink}"`,
+          `mkdir -p "${tempRoot}/hidden-tests" "${tempRoot}/repositories" && cp -R "${hiddenTestsPath}" "${tempRoot}/hidden-tests/" && ln -s "${absoluteRepoPath}" "${repositoryLink}"`,
         ],
         stdout: 'pipe',
         stderr: 'pipe',

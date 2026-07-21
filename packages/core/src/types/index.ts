@@ -219,6 +219,7 @@ export type FailureLabel = (typeof FailureLabels)[number];
 
 export type RunTermination =
   | 'completed'
+  | 'premature_completion'
   | 'turn_limit'
   | 'tool_call_limit'
   | 'wall_time_limit'

@@ -69,11 +69,6 @@ export class TaskCli {
   private handleList(args: string[]): string {
     const filter: TaskFilter = {};
 
-    const statusIdx = args.indexOf('--status');
-    if (statusIdx !== -1 && args[statusIdx + 1]) {
-      filter.status = args[statusIdx + 1] as TaskStatus;
-    }
-
     const priorityIdx = args.indexOf('--priority');
     if (priorityIdx !== -1 && args[priorityIdx + 1]) {
       filter.priority = args[priorityIdx + 1] as TaskPriority;

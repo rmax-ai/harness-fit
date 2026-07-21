@@ -16,7 +16,6 @@ import type {
   NormalizedModelResponse,
   NormalizedUsage,
   ProviderCapabilities,
-  StopReason,
   TaskId,
 } from '../src/types/index';
 
@@ -30,25 +29,27 @@ class MockProvider implements ModelProvider {
     this.lastRequest = request;
     this.responseCount++;
 
-    const content: MessageContent[] = [];
-    if (this.responseCount === 1) {
-      // First response: tool call (read_file / search_files)
-      content.push({
-        type: 'text',
-        text: 'Let me read the source file to understand the issue.',
-      });
-    } else {
-      // Second response: call finish
-      content.push({
-        type: 'text',
-        text: 'I have fixed the bug. Calling finish.',
-      });
-    }
-
-    const stopReason: StopReason = this.responseCount >= 2 ? 'end_turn' : 'tool_use';
+    const content: MessageContent[] =
+      this.responseCount === 1
+        ? [
+            {
+              type: 'tool_call',
+              id: 'read-source',
+              name: 'read_file',
+              arguments: { path: 'src/service.ts' },
+            },
+          ]
+        : [
+            {
+              type: 'tool_call',
+              id: 'finish-task',
+              name: 'finish',
+              arguments: { summary: 'Mock task complete.' },
+            },
+          ];
 
     return {
-      stopReason,
+      stopReason: 'tool_use',
       content,
       usage: {
         inputTokens: 1000 + this.responseCount * 500,
@@ -137,6 +138,36 @@ describe('E2E Integration: Mock Provider → Agent Loop → Score', () => {
 
     const completeEvent = result.events.find((e) => e.type === 'run.completed');
     expect(completeEvent).toBeDefined();
+  });
+
+  it('rejects a text-only response without an explicit finish call', async () => {
+    const provider = new MockProvider();
+    provider.generate = async () => ({
+      stopReason: 'end_turn',
+      content: [{ type: 'text', text: 'I am done.' }],
+      usage: { inputTokens: 1, outputTokens: 1, cachedTokens: 0 },
+      native: { mock: true },
+    });
+    const agentLoop = new AgentLoop({
+      model: provider,
+      modelId: 'mock-model' as TaskId as never,
+      providerModel: 'provider-facing-mock-model',
+      tools: createDefaultRegistry(),
+      systemPrompt: 'You are a coding agent.',
+    });
+    agentLoop.setToolDefinitions(getToolDefinitions());
+
+    const result = await agentLoop.execute({
+      taskId: 'premature-completion' as TaskId,
+      repoPath: '/tmp/harnessfit-premature-completion',
+      taskDescription: 'Fix the bug.',
+      configHash: 'ghi789' as ConfigHash,
+      seed: 7,
+      trialNumber: 0,
+    });
+
+    expect(result.termination).toBe('premature_completion');
+    expect(result.events.some((event) => event.type === 'run.completed')).toBeFalse();
   });
 
   it('completes a run and produces a valid score via evaluator', async () => {

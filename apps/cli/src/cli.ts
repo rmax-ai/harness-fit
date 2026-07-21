@@ -17,7 +17,7 @@ HarnessFit — Automatic Discovery of Model-Specific Agent Harness Profiles
 Commands:
   init [--force]        Initialize an experiment workspace
   providers check       Validate provider API credentials
-  baseline              Run baseline experiment
+  baseline              Run baseline experiment [--model=<id> --task=<id> --trials=<n>]
   optimize              Run hill-climbing optimization
   evaluate              Evaluate held-out tasks
   transfer              Generate cross-model transfer matrix
@@ -190,6 +190,9 @@ async function cmdRunExperiment(
     args.find((a) => a.startsWith('--experiment='))?.split('=')[1] ??
     'experiments/definitions/default.yaml';
   const requestedSplit = args.find((arg) => arg.startsWith('--split='))?.split('=')[1];
+  const requestedModel = args.find((arg) => arg.startsWith('--model='))?.split('=')[1];
+  const requestedTask = args.find((arg) => arg.startsWith('--task='))?.split('=')[1];
+  const requestedTrials = args.find((arg) => arg.startsWith('--trials='))?.split('=')[1];
 
   // 1. Load config
   console.log(`Loading experiment: ${experimentPath}`);
@@ -202,14 +205,15 @@ async function cmdRunExperiment(
 
   const raw = await file.text();
   const expConfig = parseExperimentConfig(raw);
+  const selectedModels = selectModels(expConfig.models, requestedModel);
+  const trials = parseTrialCount(requestedTrials, expConfig.trials[options.trials]);
   console.log(`  Experiment: ${expConfig.id}`);
-  console.log(`  Models: ${expConfig.models.map((m) => m.id).join(', ')}`);
-  const trials = expConfig.trials[options.trials];
+  console.log(`  Models: ${selectedModels.map((m) => m.id).join(', ')}`);
   console.log(`  Trials per model×task: ${trials}`);
 
   // 2. Create provider adapters
   console.log('\nInitializing providers...');
-  const missingCredentials = expConfig.models
+  const missingCredentials = selectedModels
     .map((model) => providerCredential(model.provider))
     .filter((credential): credential is string => !Bun.env[credential]);
   if (missingCredentials.length > 0) {
@@ -219,7 +223,7 @@ async function cmdRunExperiment(
   }
 
   const models: ModelSpec[] = [];
-  for (const m of expConfig.models) {
+  for (const m of selectedModels) {
     const providerModel = resolveProviderModel(m);
     const adapter = createProvider({ ...m, model: providerModel });
     models.push({
@@ -236,7 +240,8 @@ async function cmdRunExperiment(
   const split = requestedSplit ?? expConfig.benchmark[options.defaultSplit];
   console.log(`\nLoading ${split} tasks from ${tasksDir}/...`);
   const coordinator = new ExperimentCoordinator();
-  const tasks = await coordinator.loadTasks(tasksDir, split);
+  const loadedTasks = await coordinator.loadTasks(tasksDir, split);
+  const tasks = selectTasks(loadedTasks, requestedTask);
   if (tasks.length === 0) {
     console.error('  No tasks found. Create task definitions in benchmarks/tasks/');
     coordinator.close();
@@ -338,6 +343,42 @@ function resolveProviderModel(model: {
         ? Bun.env.HARNESSFIT_ANTHROPIC_MODEL
         : Bun.env.HARNESSFIT_GOOGLE_MODEL;
   return override || model.model;
+}
+
+function selectModels<T extends { readonly id: string }>(
+  models: readonly T[],
+  requestedModel: string | undefined,
+): readonly T[] {
+  if (!requestedModel) return models;
+  const model = models.find((candidate) => candidate.id === requestedModel);
+  if (!model) {
+    throw new Error(
+      `Unknown model '${requestedModel}'. Available: ${models.map((candidate) => candidate.id).join(', ')}`,
+    );
+  }
+  return [model];
+}
+
+function selectTasks<T extends { readonly id: string }>(
+  tasks: readonly T[],
+  requestedTask: string | undefined,
+): readonly T[] {
+  if (!requestedTask) return tasks;
+  const task = tasks.find((candidate) => candidate.id === requestedTask);
+  if (!task) {
+    throw new Error(
+      `Unknown task '${requestedTask}'. Available: ${tasks.map((candidate) => candidate.id).join(', ')}`,
+    );
+  }
+  return [task];
+}
+
+function parseTrialCount(value: string | undefined, fallback: number): number {
+  if (value === undefined) return fallback;
+  if (!/^\d+$/.test(value) || Number.parseInt(value, 10) < 1) {
+    throw new Error(`--trials must be a positive integer; received '${value}'`);
+  }
+  return Number.parseInt(value, 10);
 }
 
 async function cmdOptimize(args: string[]): Promise<void> {

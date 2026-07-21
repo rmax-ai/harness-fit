@@ -152,6 +152,13 @@ export class ExperimentCoordinator {
       trialNumber,
     };
 
+    const regressionChecker = createRegressionChecker();
+    const patchQualityAnalyzer = createPatchQualityAnalyzer();
+    const [baselineRegression, baselinePatchQuality] = await Promise.all([
+      regressionChecker.check(repoPath),
+      patchQualityAnalyzer.analyze(repoPath, ''),
+    ]);
+
     // Execute
     const runResult = await agentLoop.execute(taskContext);
 
@@ -159,23 +166,36 @@ export class ExperimentCoordinator {
     const changedFiles = readGitOutput(repoPath, ['diff', '--name-only'])
       .split('\n')
       .filter((path) => path.length > 0);
-    const [hiddenTests, regression, checkedConstraints, patchQuality] = await Promise.all([
-      createTestRunner().runHiddenTests(repoPath, task.hiddenTestsPath),
-      createRegressionChecker().check(repoPath),
-      createConstraintChecker().check(repoPath, patch, changedFiles),
-      createPatchQualityAnalyzer().analyze(repoPath, patch),
-    ]);
+    const [hiddenTests, candidateRegression, checkedConstraints, candidatePatchQuality] =
+      await Promise.all([
+        createTestRunner().runHiddenTests(repoPath, task.hiddenTestsPath, task.repository),
+        regressionChecker.check(repoPath),
+        createConstraintChecker().check(repoPath, patch, changedFiles),
+        patchQualityAnalyzer.analyze(repoPath, patch),
+      ]);
+    const regression = compareRegression(baselineRegression, candidateRegression);
+    const patchQuality = {
+      ...candidatePatchQuality,
+      newLintViolations: Math.max(
+        0,
+        candidatePatchQuality.newLintViolations - baselinePatchQuality.newLintViolations,
+      ),
+    };
 
     const functionalTests =
       runResult.termination === 'completed'
         ? hiddenTests
         : { passed: 0, total: Math.max(hiddenTests.total, 1), failures: [runResult.termination] };
-    const constraints = {
-      violations:
-        runResult.termination === 'completed'
-          ? checkedConstraints.violations
-          : [...checkedConstraints.violations, `run_not_completed:${runResult.termination}`],
-    };
+    const constraintViolations = [
+      ...checkedConstraints.violations,
+      ...(runResult.termination === 'completed'
+        ? []
+        : [`run_not_completed:${runResult.termination}`]),
+    ];
+    if (patch.trim().length === 0) {
+      constraintViolations.push('no_patch');
+    }
+    const constraints = { violations: constraintViolations };
     const evalInput: ScoringInput = {
       functionalTests,
       regression,
@@ -349,4 +369,15 @@ function deterministicSeed(modelId: string, taskId: string, trialNumber: number)
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
+}
+
+function compareRegression(
+  baseline: ScoringInput['regression'],
+  candidate: ScoringInput['regression'],
+): ScoringInput['regression'] {
+  return {
+    existingTests: candidate.existingTests,
+    typecheckPassed: !baseline.typecheckPassed || candidate.typecheckPassed,
+    lintPassed: !baseline.lintPassed || candidate.lintPassed,
+  };
 }
