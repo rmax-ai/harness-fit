@@ -4,15 +4,15 @@
  * Normalizes Anthropic's Messages API to the common ModelProvider interface.
  */
 import type {
+  Message,
+  MessageContent,
   ModelProvider,
+  Money,
   NormalizedModelRequest,
   NormalizedModelResponse,
   NormalizedUsage,
-  Money,
   ProviderCapabilities,
   StopReason,
-  Message,
-  MessageContent,
   ToolDefinition,
 } from '@harnessfit/core';
 
@@ -55,7 +55,8 @@ export class AnthropicProvider implements ModelProvider {
       messages: (req.messages as Message[])
         .filter((m) => m.role !== 'system')
         .map((m) => ({
-          role: m.role,
+          // Anthropic encodes tool results as user content blocks, not a tool role.
+          role: m.role === 'tool' ? 'user' : m.role,
           content: typeof m.content === 'string' ? m.content : this.convertContent(m.content),
         })),
       max_tokens: req.maxOutputTokens,
@@ -91,6 +92,14 @@ export class AnthropicProvider implements ModelProvider {
     const parts: Record<string, unknown>[] = [];
     for (const part of content) {
       if (part.type === 'text') parts.push({ type: 'text', text: part.text });
+      if (part.type === 'tool_call') {
+        parts.push({
+          type: 'tool_use',
+          id: part.id,
+          name: part.name,
+          input: part.arguments,
+        });
+      }
       if (part.type === 'tool_result') {
         parts.push({
           type: 'tool_result',

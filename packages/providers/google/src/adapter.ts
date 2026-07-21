@@ -4,14 +4,14 @@
  * Normalizes Gemini's generateContent API to the common ModelProvider interface.
  */
 import type {
+  MessageContent,
   ModelProvider,
+  Money,
   NormalizedModelRequest,
   NormalizedModelResponse,
   NormalizedUsage,
-  Money,
   ProviderCapabilities,
   StopReason,
-  MessageContent,
 } from '@harnessfit/core';
 
 export class GoogleProvider implements ModelProvider {
@@ -47,6 +47,7 @@ export class GoogleProvider implements ModelProvider {
   private buildRequest(req: NormalizedModelRequest): Record<string, unknown> {
     const contents: Record<string, unknown>[] = [];
     const systemInstruction = req.system ? { parts: [{ text: req.system }] } : undefined;
+    const toolNames = new Map<string, string>();
 
     for (const msg of req.messages) {
       if (msg.role === 'system') continue;
@@ -63,16 +64,21 @@ export class GoogleProvider implements ModelProvider {
           if (part.type === 'text') {
             parts.push({ text: part.text });
           } else if (part.type === 'tool_call') {
+            toolNames.set(part.id, part.name);
             parts.push({
               functionCall: {
                 name: part.name,
                 args: part.arguments,
               },
+              ...(typeof part.providerMetadata?.thoughtSignature === 'string'
+                ? { thoughtSignature: part.providerMetadata.thoughtSignature }
+                : {}),
             });
           } else if (part.type === 'tool_result') {
             parts.push({
               functionResponse: {
-                name: 'tool',
+                name: toolNames.get(part.toolCallId) ?? 'tool',
+                id: part.toolCallId,
                 response: { result: part.result },
               },
             });
@@ -140,9 +146,13 @@ export class GoogleProvider implements ModelProvider {
           const fc = part.functionCall as Record<string, unknown>;
           content.push({
             type: 'tool_call',
-            id: `gemini-${Math.random().toString(36).slice(2)}`,
+            id: typeof fc.id === 'string' ? fc.id : `gemini-${Math.random().toString(36).slice(2)}`,
             name: fc.name as string,
             arguments: fc.args as Record<string, unknown>,
+            providerMetadata:
+              typeof part.thoughtSignature === 'string'
+                ? { thoughtSignature: part.thoughtSignature }
+                : undefined,
           });
         }
       }

@@ -45,6 +45,8 @@ export interface ToolCallContent {
   readonly id: string;
   readonly name: string;
   readonly arguments: Record<string, unknown>;
+  /** Provider-specific metadata that must survive a tool-result round trip. */
+  readonly providerMetadata?: Record<string, unknown>;
 }
 
 export interface ToolResultContent {

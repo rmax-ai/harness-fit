@@ -57,12 +57,27 @@ export class OpenAIProvider implements ModelProvider {
       tools: req.tools.length > 0 ? req.tools.map((t) => this.convertTool(t)) : undefined,
       max_completion_tokens: req.maxOutputTokens,
       temperature: req.model.startsWith('gpt-5') ? undefined : req.temperature,
+      reasoning_effort: req.model.startsWith('gpt-5') && req.tools.length > 0 ? 'none' : undefined,
     };
   }
 
   private convertMessage(msg: Message): Record<string, unknown> {
     if (typeof msg.content === 'string') {
       return { role: msg.role, content: msg.content };
+    }
+
+    if (msg.role === 'tool') {
+      const result = msg.content.find(
+        (part): part is Extract<MessageContent, { type: 'tool_result' }> =>
+          part.type === 'tool_result',
+      );
+      if (result) {
+        return {
+          role: 'tool',
+          tool_call_id: result.toolCallId,
+          content: result.result,
+        };
+      }
     }
 
     // Multi-part content

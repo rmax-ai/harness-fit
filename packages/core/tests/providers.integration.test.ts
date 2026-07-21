@@ -7,11 +7,20 @@
  * Run: HARNESSFIT_LIVE_TEST=1 bun test packages/core/tests/providers.integration.test.ts
  */
 import { describe, expect, it } from 'bun:test';
+import type { Message, ModelProvider, ToolDefinition } from '../src/types/index';
 
 const LIVE = Bun.env.HARNESSFIT_LIVE_TEST === '1';
 const OPENAI_MODEL = Bun.env.HARNESSFIT_OPENAI_MODEL || 'gpt-5.6-luna';
 const ANTHROPIC_MODEL = Bun.env.HARNESSFIT_ANTHROPIC_MODEL || 'claude-haiku-4-5';
 const GOOGLE_MODEL = Bun.env.HARNESSFIT_GOOGLE_MODEL || 'gemini-3.5-flash';
+
+const READ_FILE_TOOL: ToolDefinition = {
+  name: 'read_file',
+  description: 'Read a text file from the repository.',
+  parameters: {
+    path: { type: 'string', description: 'Relative path to the file.', required: true },
+  },
+};
 
 // Dynamic imports so we don't fail on module resolution when keys aren't set
 async function getProviders() {
@@ -24,6 +33,49 @@ async function getProviders() {
 function skipIfNoKey(key: string): boolean {
   if (!LIVE) return true;
   return !Bun.env[key];
+}
+
+async function runToolResultRoundTrip(
+  provider: ModelProvider,
+  model: string,
+  toolCallId: string,
+): Promise<void> {
+  const messages: Message[] = [
+    { role: 'user', content: 'Read README.md and summarize the result.' },
+    {
+      role: 'assistant',
+      content: [
+        {
+          type: 'tool_call',
+          id: toolCallId,
+          name: 'read_file',
+          arguments: { path: 'README.md' },
+          providerMetadata: { thoughtSignature: 'skip_thought_signature_validator' },
+        },
+      ],
+    },
+    {
+      role: 'tool',
+      content: [
+        {
+          type: 'tool_result',
+          toolCallId,
+          result: '# HarnessFit\nTool round-trip smoke result.',
+        },
+      ],
+    },
+  ];
+  const response = await provider.generate({
+    model,
+    system: 'Summarize tool results for the user.',
+    messages,
+    tools: [READ_FILE_TOOL],
+    maxOutputTokens: 256,
+    temperature: 0,
+  });
+
+  expect(response.stopReason).toBeOneOf(['end_turn', 'max_tokens', 'tool_use']);
+  expect(response.usage.inputTokens).toBeGreaterThan(0);
 }
 
 describe('Provider Integration (live API)', () => {
@@ -74,6 +126,11 @@ describe('Provider Integration (live API)', () => {
     expect(caps.maxContextTokens).toBeGreaterThan(0);
   });
 
+  (runOpenAI ? it : it.skip)('OpenAI: accepts a serialized tool-result round trip', async () => {
+    const { OpenAIProvider } = await getProviders();
+    await runToolResultRoundTrip(new OpenAIProvider(), OPENAI_MODEL, 'call_harnessfit_smoke');
+  });
+
   // ── Anthropic ───────────────────────────────────
 
   const runAnthropic = !skipIfNoKey('ANTHROPIC_API_KEY');
@@ -110,6 +167,18 @@ describe('Provider Integration (live API)', () => {
     expect(cost.currency).toBe('USD');
   });
 
+  (runAnthropic ? it : it.skip)(
+    'Anthropic: accepts a serialized tool-result round trip',
+    async () => {
+      const { AnthropicProvider } = await getProviders();
+      await runToolResultRoundTrip(
+        new AnthropicProvider(),
+        ANTHROPIC_MODEL,
+        'toolu_01HarnessFitSmoke',
+      );
+    },
+  );
+
   // ── Google ──────────────────────────────────────
 
   const runGoogle = !skipIfNoKey('GOOGLE_API_KEY');
@@ -143,5 +212,10 @@ describe('Provider Integration (live API)', () => {
 
     expect(cost.amount).toBeGreaterThan(0);
     expect(cost.currency).toBe('USD');
+  });
+
+  (runGoogle ? it : it.skip)('Google: accepts a serialized tool-result round trip', async () => {
+    const { GoogleProvider } = await getProviders();
+    await runToolResultRoundTrip(new GoogleProvider(), GOOGLE_MODEL, 'gemini-harnessfit-smoke');
   });
 });
