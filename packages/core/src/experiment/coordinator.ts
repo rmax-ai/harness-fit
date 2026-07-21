@@ -18,7 +18,7 @@ import {
   createTestRunner,
 } from '@harnessfit/evaluator';
 import type { HarnessConfig } from '@harnessfit/harness';
-import { compileHarness } from '@harnessfit/harness';
+import { compileHarness, hashConfig } from '@harnessfit/harness';
 import { HarnessDB } from '@harnessfit/storage';
 
 // ── Types ────────────────────────────────────────────
@@ -120,7 +120,9 @@ export class ExperimentCoordinator {
     limits?: Partial<RunLimits>,
   ): Promise<TrialResult> {
     // Compile harness
-    const compiled = compileHarness(harness, [], '');
+    const harnessHash = hashConfig(harness);
+    const compiled = compileHarness(harness, [], harnessHash);
+    this.db.saveConfig(harnessHash, JSON.stringify(harness));
 
     // Create tool registry
     const tools = createDefaultRegistry();
